@@ -1,0 +1,238 @@
+<div class="pdf-editor">
+  <!-- Upload Area -->
+  @if (!pdfLoaded()) {
+    <div class="upload-area" 
+         (drop)="onDrop($event)" 
+         (dragover)="onDragOver($event)"
+         (click)="openFileDialog()">
+      <input #fileInput 
+             type="file" 
+             accept=".pdf" 
+             (change)="onFileSelect($event)" 
+             hidden>
+      
+      <div class="upload-content">
+        <svg class="upload-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+        </svg>
+        <h2>Arraste um PDF aqui</h2>
+        <p>ou clique para selecionar</p>
+      </div>
+    </div>
+  }
+
+  <!-- Editor Area -->
+  @if (pdfLoaded()) {
+    <div class="editor-container">
+      <!-- Toolbar -->
+      <div class="toolbar">
+        <div class="toolbar-section">
+          <button class="btn btn-icon" (click)="resetEditor()" title="Novo arquivo">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+          </button>
+          <span class="file-name">{{ fileName() }}</span>
+        </div>
+
+        <div class="toolbar-section tools">
+          <button class="btn btn-tool" 
+                  [class.active]="selectedTool() === 'select'"
+                  (click)="selectTool('select')" 
+                  title="Selecionar">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
+            </svg>
+          </button>
+          <button class="btn btn-tool" 
+                  [class.active]="selectedTool() === 'text'"
+                  (click)="selectTool('text')" 
+                  title="Adicionar texto">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+          </button>
+          <button class="btn btn-tool" 
+                  (click)="addNewPage()" 
+                  title="Adicionar nova página">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="toolbar-section text-options">
+          <label>
+            Tamanho:
+            <input type="number" 
+                   [value]="fontSize()" 
+                   (change)="fontSize.set(+$any($event.target).value)"
+                   min="8" 
+                   max="72" 
+                   class="input-small">
+          </label>
+          <label>
+            Cor:
+            <input type="color" 
+                   [value]="textColor()" 
+                   (change)="textColor.set($any($event.target).value)"
+                   class="input-color">
+          </label>
+        </div>
+
+        <div class="toolbar-section zoom-controls">
+          <button class="btn btn-icon" (click)="zoomOut()" title="Diminuir zoom">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" />
+            </svg>
+          </button>
+          <span class="zoom-level">{{ (zoom() * 100).toFixed(0) }}%</span>
+          <button class="btn btn-icon" (click)="zoomIn()" title="Aumentar zoom">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="toolbar-section">
+          <button class="btn btn-primary" (click)="downloadPdf()" [disabled]="isLoading()">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Baixar PDF
+          </button>
+        </div>
+      </div>
+
+      <!-- Main Content -->
+      <div class="main-content">
+        <!-- Pages Sidebar (Left) -->
+        @if (showPagesSidebar()) {
+          <div class="pages-sidebar">
+            <div class="pages-sidebar-header">
+              <span>Páginas</span>
+              <button class="btn btn-icon btn-small" (click)="togglePagesSidebar()" title="Fechar">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                </svg>
+              </button>
+            </div>
+            <div class="pages-list">
+              @for (page of pages(); track page) {
+                <app-page-thumbnail
+                  [pageNumber]="page"
+                  [isActive]="currentPage() === page"
+                  [annotations]="annotationsByPage().get(page) || []"
+                  (pageSelect)="goToPage($event)">
+                </app-page-thumbnail>
+              }
+            </div>
+          </div>
+        }
+
+        <!-- Toggle Pages Sidebar Button -->
+        @if (!showPagesSidebar()) {
+          <button class="toggle-sidebar-btn" (click)="togglePagesSidebar()" title="Mostrar páginas">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+            </svg>
+          </button>
+        }
+
+        <!-- Canvas Area -->
+        <div class="canvas-wrapper">
+          <div class="canvas-container" 
+               [style.width.px]="canvasWidth()" 
+               [style.height.px]="canvasHeight()">
+            <canvas #pdfCanvas class="pdf-canvas"></canvas>
+            
+            <!-- Annotation Layer -->
+            <div #annotationLayer 
+                 class="annotation-layer"
+                 (mousedown)="onCanvasMouseDown($event)">
+              @for (annotation of annotations(); track annotation.id) {
+                <div class="text-annotation"
+                     [class.selected]="isSelected(annotation)"
+                     [class.dragging]="isDragging && isSelected(annotation)"
+                     [ngStyle]="getAnnotationStyle(annotation)"
+                     (mousedown)="onAnnotationMouseDown(annotation, $event)">
+                  {{ annotation.text }}
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+
+        <!-- Properties Panel -->
+        @if (selectedAnnotation()) {
+          <div class="properties-panel">
+            <h3>Propriedades do Texto</h3>
+            
+            <div class="property-group">
+              <label>Texto:</label>
+              <input #textInput
+                     type="text" 
+                     [value]="selectedAnnotation()?.text" 
+                     (input)="updateAnnotationText($event)"
+                     class="input-full">
+            </div>
+
+            <div class="property-group">
+              <label>Tamanho:</label>
+              <input type="number" 
+                     [value]="(selectedAnnotation()?.fontSize ?? 16) * zoom() | number:'1.0-0'"
+                     (input)="updateAnnotationFontSize($event)"
+                     min="8" 
+                     max="72"
+                     class="input-full">
+            </div>
+
+            <div class="property-group">
+              <label>Cor:</label>
+              <input type="color" 
+                     [value]="selectedAnnotation()?.color"
+                     (input)="updateAnnotationColor($event)"
+                     class="input-full">
+            </div>
+
+            <button class="btn btn-danger" (click)="deleteSelectedAnnotation()">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Excluir
+            </button>
+          </div>
+        }
+      </div>
+
+      <!-- Page Navigation -->
+      <div class="page-navigation">
+        <button class="btn btn-icon" 
+                (click)="previousPage()" 
+                [disabled]="currentPage() === 1">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+        <span class="page-info">
+          Página {{ currentPage() }} de {{ totalPages() }}
+        </span>
+        <button class="btn btn-icon" 
+                (click)="nextPage()" 
+                [disabled]="currentPage() === totalPages()">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  }
+
+  <!-- Loading Overlay -->
+  @if (isLoading()) {
+    <div class="loading-overlay">
+      <div class="spinner"></div>
+      <p>Processando...</p>
+    </div>
+  }
+</div>
