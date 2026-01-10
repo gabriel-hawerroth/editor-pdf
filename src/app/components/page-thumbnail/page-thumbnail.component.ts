@@ -11,7 +11,11 @@ import {
   SimpleChanges,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { PdfService, TextAnnotation } from '../../services/pdf.service';
+import {
+  PdfService,
+  TextAnnotation,
+  PencilAnnotation,
+} from '../../services/pdf.service';
 
 @Component({
   selector: 'app-page-thumbnail',
@@ -116,6 +120,7 @@ export class PageThumbnailComponent
   @Input() pageNumber: number = 1;
   @Input() isActive: boolean = false;
   @Input() annotations: TextAnnotation[] = [];
+  @Input() pencilAnnotations: PencilAnnotation[] = [];
   @Output() pageSelect = new EventEmitter<number>();
 
   isLoading = true;
@@ -142,7 +147,11 @@ export class PageThumbnailComponent
 
   ngOnChanges(changes: SimpleChanges): void {
     // Re-renderizar quando as anotações mudarem
-    if (changes['annotations'] && this.isRendered && this.canvasRef) {
+    if (
+      (changes['annotations'] || changes['pencilAnnotations']) &&
+      this.isRendered &&
+      this.canvasRef
+    ) {
       this.renderThumbnail();
     }
   }
@@ -159,7 +168,8 @@ export class PageThumbnailComponent
         this.pageNumber,
         this.canvasRef.nativeElement,
         140,
-        this.annotations
+        this.annotations,
+        this.pencilAnnotations
       );
       this.isRendered = true;
     } catch (error) {
