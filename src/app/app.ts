@@ -6,11 +6,13 @@ import { PdfEditorComponent } from './components/pdf-editor/pdf-editor.component
   standalone: true,
   imports: [PdfEditorComponent],
   template: '<app-pdf-editor></app-pdf-editor>',
-  styles: [`
-    :host {
-      display: block;
-      height: 100vh;
-    }
-  `]
+  styles: [
+    `
+      :host {
+        display: block;
+        height: 100vh;
+      }
+    `,
+  ],
 })
 export class App {}

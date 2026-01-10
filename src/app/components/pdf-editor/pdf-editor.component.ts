@@ -1,4 +1,13 @@
-import { Component, ElementRef, ViewChild, signal, computed, AfterViewChecked, HostListener, OnDestroy } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  ViewChild,
+  signal,
+  computed,
+  AfterViewChecked,
+  HostListener,
+  OnDestroy,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { PdfService, TextAnnotation } from '../../services/pdf.service';
@@ -11,14 +20,14 @@ type Tool = 'select' | 'text';
   standalone: true,
   imports: [CommonModule, FormsModule, PageThumbnailComponent],
   templateUrl: './pdf-editor.component.html',
-  styleUrl: './pdf-editor.component.scss'
+  styleUrl: './pdf-editor.component.scss',
 })
 export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
   @ViewChild('fileInput') fileInput!: ElementRef<HTMLInputElement>;
   @ViewChild('pdfCanvas') pdfCanvas!: ElementRef<HTMLCanvasElement>;
   @ViewChild('annotationLayer') annotationLayer!: ElementRef<HTMLDivElement>;
   @ViewChild('textInput') textInput!: ElementRef<HTMLInputElement>;
-  @ViewChild('canvasWrapper') canvasWrapper!: ElementRef<HTMLDivElement>;;
+  @ViewChild('canvasWrapper') canvasWrapper!: ElementRef<HTMLDivElement>;
 
   // Estado reativo
   pdfLoaded = signal(false);
@@ -50,19 +59,21 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
   showPagesSidebar = signal(true);
 
   // Usando computed com o signal do serviço para reatividade
-  annotations = computed(() => 
-    this.pdfService.annotations().filter(a => a.pageNumber === this.currentPage())
+  annotations = computed(() =>
+    this.pdfService
+      .annotations()
+      .filter((a) => a.pageNumber === this.currentPage())
   );
 
   // Array de números de páginas para o ngFor
-  pages = computed(() => 
+  pages = computed(() =>
     Array.from({ length: this.totalPages() }, (_, i) => i + 1)
   );
 
   // Snapshot de anotações para thumbnails - só atualiza em momentos específicos
   // (quando sidebar fecha, drag termina, ou PDF é carregado)
   private thumbnailAnnotationsSnapshot = signal<TextAnnotation[]>([]);
-  
+
   // Mapa de anotações por página para os thumbnails (baseado no snapshot)
   annotationsByPage = computed(() => {
     const map = new Map<number, TextAnnotation[]>();
@@ -94,7 +105,7 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
   onWheel(event: WheelEvent): void {
     if (event.ctrlKey && this.pdfLoaded()) {
       event.preventDefault();
-      
+
       if (event.deltaY < 0) {
         this.zoomIn();
       } else {
@@ -126,7 +137,7 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
   onDrop(event: DragEvent): void {
     event.preventDefault();
     event.stopPropagation();
-    
+
     if (event.dataTransfer?.files && event.dataTransfer.files[0]) {
       const file = event.dataTransfer.files[0];
       if (file.type === 'application/pdf') {
@@ -150,7 +161,7 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
       this.currentPage.set(1);
       this.pdfLoaded.set(true);
       this.updateThumbnailSnapshot();
-      
+
       // Aguardar o próximo ciclo para garantir que o canvas está no DOM
       setTimeout(() => this.renderCurrentPage(), 0);
     } catch (error) {
@@ -179,7 +190,7 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
 
   previousPage(): void {
     if (this.currentPage() > 1) {
-      this.currentPage.update(p => p - 1);
+      this.currentPage.update((p) => p - 1);
       this.selectedAnnotation.set(null);
       this.renderCurrentPage();
     }
@@ -187,7 +198,7 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
 
   nextPage(): void {
     if (this.currentPage() < this.totalPages()) {
-      this.currentPage.update(p => p + 1);
+      this.currentPage.update((p) => p + 1);
       this.selectedAnnotation.set(null);
       this.renderCurrentPage();
     }
@@ -202,12 +213,12 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
   }
 
   togglePagesSidebar(): void {
-    this.showPagesSidebar.update(v => !v);
+    this.showPagesSidebar.update((v) => !v);
   }
 
   async addNewPage(): Promise<void> {
     if (!this.pdfLoaded()) return;
-    
+
     this.isLoading.set(true);
     try {
       const newPageNumber = await this.pdfService.addNewPage();
@@ -226,12 +237,12 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
   }
 
   zoomIn(): void {
-    this.zoom.update(z => Math.min(z + 0.25, 3));
+    this.zoom.update((z) => Math.min(z + 0.25, 3));
     this.renderCurrentPage();
   }
 
   zoomOut(): void {
-    this.zoom.update(z => Math.max(z - 0.25, 0.5));
+    this.zoom.update((z) => Math.max(z - 0.25, 0.5));
     this.renderCurrentPage();
   }
 
@@ -254,7 +265,7 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
         y: y,
         fontSize: this.fontSize() / this.zoom(),
         color: this.textColor(),
-        pageNumber: this.currentPage()
+        pageNumber: this.currentPage(),
       });
 
       this.selectedAnnotation.set(annotation);
@@ -274,7 +285,7 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
   onAnnotationMouseDown(annotation: TextAnnotation, event: MouseEvent): void {
     event.stopPropagation();
     event.preventDefault();
-    
+
     if (this.selectedTool() === 'select') {
       this.isDragging = true;
       this.hasMoved = false;
@@ -305,8 +316,11 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
       const newX = this.dragAnnotationStartX + deltaX;
       const newY = this.dragAnnotationStartY + deltaY;
 
-      this.pdfService.updateAnnotation(this.draggedAnnotation.id, { x: newX, y: newY });
-      
+      this.pdfService.updateAnnotation(this.draggedAnnotation.id, {
+        x: newX,
+        y: newY,
+      });
+
       // Atualizar referência local para manter a posição sincronizada
       this.draggedAnnotation = { ...this.draggedAnnotation, x: newX, y: newY };
     }
@@ -349,8 +363,13 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
     const size = parseInt(input.value, 10);
     const selected = this.selectedAnnotation();
     if (selected && size > 0) {
-      this.pdfService.updateAnnotation(selected.id, { fontSize: size / this.zoom() });
-      this.selectedAnnotation.set({ ...selected, fontSize: size / this.zoom() });
+      this.pdfService.updateAnnotation(selected.id, {
+        fontSize: size / this.zoom(),
+      });
+      this.selectedAnnotation.set({
+        ...selected,
+        fontSize: size / this.zoom(),
+      });
     }
   }
 
@@ -408,7 +427,7 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
       left: `${annotation.x * this.zoom()}px`,
       top: `${annotation.y * this.zoom()}px`,
       fontSize: `${annotation.fontSize * this.zoom()}px`,
-      color: annotation.color
+      color: annotation.color,
     };
   }
 
