@@ -1,10 +1,13 @@
 import {
   Component,
-  ElementRef,
   signal,
   computed,
   HostListener,
   OnDestroy,
+  ChangeDetectionStrategy,
+  inject,
+  Injector,
+  afterNextRender,
 } from '@angular/core';
 
 import {
@@ -16,8 +19,14 @@ import {
 
 // Components
 import { UploadAreaComponent } from '../upload-area/upload-area.component';
-import { EditorToolbarComponent, Tool } from '../editor-toolbar/editor-toolbar.component';
-import { PagesSidebarComponent, PageItem } from '../pages-sidebar/pages-sidebar.component';
+import {
+  EditorToolbarComponent,
+  Tool,
+} from '../editor-toolbar/editor-toolbar.component';
+import {
+  PagesSidebarComponent,
+  PageItem,
+} from '../pages-sidebar/pages-sidebar.component';
 import { CanvasAreaComponent } from '../canvas-area/canvas-area.component';
 import { AnnotationPropertiesComponent } from '../annotation-properties/annotation-properties.component';
 import { PageNavigationComponent } from '../page-navigation/page-navigation.component';
@@ -33,60 +42,62 @@ import { LoadingOverlayComponent } from '../loading-overlay/loading-overlay.comp
     CanvasAreaComponent,
     AnnotationPropertiesComponent,
     PageNavigationComponent,
-    LoadingOverlayComponent
-],
+    LoadingOverlayComponent,
+  ],
   templateUrl: './pdf-editor.component.html',
   styleUrl: './pdf-editor.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class PdfEditorComponent implements OnDestroy {
+  private readonly pdfService = inject(PdfService);
+  private readonly injector = inject(Injector);
+
   // Estado reativo
-  pdfLoaded = signal(false);
-  currentPage = signal(1);
-  totalPages = signal(0);
-  zoom = signal(1.5);
-  selectedTool = signal<Tool>('select');
-  selectedAnnotation = signal<TextAnnotation | null>(null);
-  isLoading = signal(false);
-  fileName = signal('');
+  readonly pdfLoaded = signal(false);
+  readonly currentPage = signal(1);
+  readonly totalPages = signal(0);
+  readonly zoom = signal(1.5);
+  readonly selectedTool = signal<Tool>('select');
+  readonly selectedAnnotation = signal<TextAnnotation | null>(null);
+  readonly isLoading = signal(false);
+  readonly fileName = signal('');
 
   // Configurações de texto
-  fontSize = signal(16);
-  textColor = signal('#000000');
+  readonly fontSize = signal(16);
+  readonly textColor = signal('#000000');
 
   // Configurações do lápis
-  pencilColor = signal('#000000');
-  pencilStrokeWidth = signal(3);
-  pencilOpacity = signal(1);
+  readonly pencilColor = signal('#000000');
+  readonly pencilStrokeWidth = signal(3);
+  readonly pencilOpacity = signal(1);
 
   // Conta-gotas
-  eyedropperTarget = signal<'text' | 'pencil'>('pencil');
-  eyedropperActive = signal(false);
-  previousTool = signal<Tool>('select');
+  readonly eyedropperTarget = signal<'text' | 'pencil'>('pencil');
+  readonly eyedropperActive = signal(false);
+  readonly previousTool = signal<Tool>('select');
 
   // Configurações da borracha
-  eraserSize = signal(20);
-  eraserCursorVisible = signal(false);
-  eraserCursorX = signal(0);
-  eraserCursorY = signal(0);
+  readonly eraserSize = signal(20);
+  readonly eraserCursorVisible = signal(false);
+  readonly eraserCursorX = signal(0);
+  readonly eraserCursorY = signal(0);
 
-  // Estado do lápis
-  isDrawing = false;
-  private currentPencilPoints: { x: number; y: number }[] = [];
+  // Estado do lápis (convertido para signals)
+  readonly isDrawing = signal(false);
+  private readonly currentPencilPoints = signal<{ x: number; y: number }[]>([]);
 
   // Dimensões do canvas
-  canvasWidth = signal(0);
-  canvasHeight = signal(0);
+  readonly canvasWidth = signal(0);
+  readonly canvasHeight = signal(0);
 
-  // Estado de arrastar (drag)
-  isDragging = false;
-  private dragStartX = 0;
-  private dragStartY = 0;
-  private dragAnnotationStartX = 0;
-  private dragAnnotationStartY = 0;
-  shouldFocusTextInput = signal(false);
+  // Estado de arrastar (drag) - convertido para signals
+  readonly isDragging = signal(false);
+  private readonly dragStart = signal({ x: 0, y: 0 });
+  private readonly dragAnnotationStart = signal({ x: 0, y: 0 });
+  readonly shouldFocusTextInput = signal(false);
 
   // Sidebar de páginas
-  showPagesSidebar = signal(true);
+  readonly showPagesSidebar = signal(true);
 
   // Canvas e annotation layer refs
   private pdfCanvas: HTMLCanvasElement | null = null;
@@ -153,8 +164,6 @@ export class PdfEditorComponent implements OnDestroy {
     }
   }
 
-  constructor(private pdfService: PdfService) {}
-
   @HostListener('wheel', ['$event'])
   onWheel(event: WheelEvent): void {
     if (event.ctrlKey && this.pdfLoaded()) {
@@ -192,7 +201,9 @@ export class PdfEditorComponent implements OnDestroy {
       this.pdfLoaded.set(true);
       this.updateThumbnailSnapshot();
 
-      setTimeout(() => this.renderCurrentPage(), 0);
+      afterNextRender(() => this.renderCurrentPage(), {
+        injector: this.injector,
+      });
     } catch (error) {
       console.error('Erro ao carregar PDF:', error);
       alert('Erro ao carregar o arquivo PDF. Verifique se o arquivo é válido.');
@@ -361,7 +372,10 @@ export class PdfEditorComponent implements OnDestroy {
     }
   }
 
-  async onPageReorder(event: { fromIndex: number; toIndex: number }): Promise<void> {
+  async onPageReorder(event: {
+    fromIndex: number;
+    toIndex: number;
+  }): Promise<void> {
     if (!this.pdfLoaded()) return;
 
     this.isLoading.set(true);
@@ -515,15 +529,19 @@ export class PdfEditorComponent implements OnDestroy {
     }
   }
 
-  onAnnotationMouseDown(data: { annotation: TextAnnotation; event: MouseEvent }): void {
+  onAnnotationMouseDown(data: {
+    annotation: TextAnnotation;
+    event: MouseEvent;
+  }): void {
     if (this.selectedTool() === 'select') {
-      this.isDragging = true;
-      this.hasMoved = false;
-      this.dragStartX = data.event.clientX;
-      this.dragStartY = data.event.clientY;
-      this.dragAnnotationStartX = data.annotation.x;
-      this.dragAnnotationStartY = data.annotation.y;
-      this.draggedAnnotation = data.annotation;
+      this.isDragging.set(true);
+      this.hasMoved.set(false);
+      this.dragStart.set({ x: data.event.clientX, y: data.event.clientY });
+      this.dragAnnotationStart.set({
+        x: data.annotation.x,
+        y: data.annotation.y,
+      });
+      this.draggedAnnotation.set(data.annotation);
 
       document.addEventListener('mousemove', this.onMouseMove);
       document.addEventListener('mouseup', this.onMouseUp);
@@ -538,21 +556,21 @@ export class PdfEditorComponent implements OnDestroy {
     const x = (event.clientX - rect.left) / this.zoom();
     const y = (event.clientY - rect.top) / this.zoom();
 
-    this.isDrawing = true;
-    this.currentPencilPoints = [{ x, y }];
+    this.isDrawing.set(true);
+    this.currentPencilPoints.set([{ x, y }]);
 
     document.addEventListener('mousemove', this.onPencilMove);
     document.addEventListener('mouseup', this.onPencilUp);
   }
 
   private onPencilMove = (event: MouseEvent): void => {
-    if (!this.isDrawing || !this.annotationLayerElement) return;
+    if (!this.isDrawing() || !this.annotationLayerElement) return;
 
     const rect = this.annotationLayerElement.getBoundingClientRect();
     const x = (event.clientX - rect.left) / this.zoom();
     const y = (event.clientY - rect.top) / this.zoom();
 
-    this.currentPencilPoints.push({ x, y });
+    this.currentPencilPoints.update((pts) => [...pts, { x, y }]);
     this.drawCurrentStroke();
   };
 
@@ -560,9 +578,10 @@ export class PdfEditorComponent implements OnDestroy {
     document.removeEventListener('mousemove', this.onPencilMove);
     document.removeEventListener('mouseup', this.onPencilUp);
 
-    if (this.currentPencilPoints.length > 1) {
+    const points = this.currentPencilPoints();
+    if (points.length > 1) {
       this.pdfService.addPencilAnnotation({
-        points: [...this.currentPencilPoints],
+        points: [...points],
         color: this.pencilColor(),
         strokeWidth: this.pencilStrokeWidth(),
         opacity: this.pencilOpacity(),
@@ -571,23 +590,24 @@ export class PdfEditorComponent implements OnDestroy {
       this.updateThumbnailSnapshot();
     }
 
-    this.isDrawing = false;
-    this.currentPencilPoints = [];
+    this.isDrawing.set(false);
+    this.currentPencilPoints.set([]);
     this.renderCurrentPage();
   };
 
   // Eraser methods
-  private isErasing = false;
-  private lastEraseX = 0;
-  private lastEraseY = 0;
+  private readonly isErasing = signal(false);
+  private readonly lastErasePos = signal({ x: 0, y: 0 });
 
   private startErasing(event: MouseEvent): void {
     if (!this.annotationLayerElement) return;
 
-    this.isErasing = true;
+    this.isErasing.set(true);
     const rect = this.annotationLayerElement.getBoundingClientRect();
-    this.lastEraseX = event.clientX - rect.left;
-    this.lastEraseY = event.clientY - rect.top;
+    this.lastErasePos.set({
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+    });
     this.eraseAtPosition(event);
 
     document.addEventListener('mousemove', this.onEraserMove);
@@ -595,14 +615,15 @@ export class PdfEditorComponent implements OnDestroy {
   }
 
   private onEraserMove = (event: MouseEvent): void => {
-    if (!this.isErasing || !this.annotationLayerElement) return;
+    if (!this.isErasing() || !this.annotationLayerElement) return;
 
     const rect = this.annotationLayerElement.getBoundingClientRect();
     const currentX = event.clientX - rect.left;
     const currentY = event.clientY - rect.top;
 
-    const dx = currentX - this.lastEraseX;
-    const dy = currentY - this.lastEraseY;
+    const lastPos = this.lastErasePos();
+    const dx = currentX - lastPos.x;
+    const dy = currentY - lastPos.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
     const step = this.eraserSize() / 4;
     const eraserRadiusScreen = this.eraserSize() / 2;
@@ -612,22 +633,21 @@ export class PdfEditorComponent implements OnDestroy {
 
       for (let i = 1; i <= steps; i++) {
         const t = i / steps;
-        const interpX = this.lastEraseX + dx * t;
-        const interpY = this.lastEraseY + dy * t;
+        const interpX = lastPos.x + dx * t;
+        const interpY = lastPos.y + dy * t;
         this.eraseAtScreenCoords(interpX, interpY, eraserRadiusScreen);
       }
     } else {
       this.eraseAtScreenCoords(currentX, currentY, eraserRadiusScreen);
     }
 
-    this.lastEraseX = currentX;
-    this.lastEraseY = currentY;
+    this.lastErasePos.set({ x: currentX, y: currentY });
   };
 
   private onEraserUp = (): void => {
     document.removeEventListener('mousemove', this.onEraserMove);
     document.removeEventListener('mouseup', this.onEraserUp);
-    this.isErasing = false;
+    this.isErasing.set(false);
     this.updateThumbnailSnapshot();
   };
 
@@ -825,7 +845,8 @@ export class PdfEditorComponent implements OnDestroy {
   }
 
   private drawCurrentStroke(): void {
-    if (!this.pdfCanvas || this.currentPencilPoints.length < 2) return;
+    const points = this.currentPencilPoints();
+    if (!this.pdfCanvas || points.length < 2) return;
 
     this.renderCurrentPage().then(() => {
       this.drawAllPencilAnnotations();
@@ -834,7 +855,8 @@ export class PdfEditorComponent implements OnDestroy {
   }
 
   private drawTemporaryStroke(): void {
-    if (!this.pdfCanvas || this.currentPencilPoints.length < 2) return;
+    const points = this.currentPencilPoints();
+    if (!this.pdfCanvas || points.length < 2) return;
 
     const canvas = this.pdfCanvas;
     const context = canvas.getContext('2d');
@@ -849,16 +871,10 @@ export class PdfEditorComponent implements OnDestroy {
     context.lineJoin = 'round';
     context.globalAlpha = this.pencilOpacity();
 
-    context.moveTo(
-      this.currentPencilPoints[0].x * zoom,
-      this.currentPencilPoints[0].y * zoom
-    );
+    context.moveTo(points[0].x * zoom, points[0].y * zoom);
 
-    for (let i = 1; i < this.currentPencilPoints.length; i++) {
-      context.lineTo(
-        this.currentPencilPoints[i].x * zoom,
-        this.currentPencilPoints[i].y * zoom
-      );
+    for (let i = 1; i < points.length; i++) {
+      context.lineTo(points[i].x * zoom, points[i].y * zoom);
     }
 
     context.stroke();
@@ -896,29 +912,32 @@ export class PdfEditorComponent implements OnDestroy {
   }
 
   // Drag methods
-  private hasMoved = false;
-  private draggedAnnotation: TextAnnotation | null = null;
+  private readonly hasMoved = signal(false);
+  private readonly draggedAnnotation = signal<TextAnnotation | null>(null);
 
   private onMouseMove = (event: MouseEvent): void => {
-    if (!this.isDragging || !this.draggedAnnotation) return;
+    const dragged = this.draggedAnnotation();
+    if (!this.isDragging() || !dragged) return;
 
-    const deltaX = (event.clientX - this.dragStartX) / this.zoom();
-    const deltaY = (event.clientY - this.dragStartY) / this.zoom();
+    const start = this.dragStart();
+    const deltaX = (event.clientX - start.x) / this.zoom();
+    const deltaY = (event.clientY - start.y) / this.zoom();
 
     if (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3) {
-      this.hasMoved = true;
+      this.hasMoved.set(true);
     }
 
-    if (this.hasMoved) {
-      const newX = this.dragAnnotationStartX + deltaX;
-      const newY = this.dragAnnotationStartY + deltaY;
+    if (this.hasMoved()) {
+      const annotationStart = this.dragAnnotationStart();
+      const newX = annotationStart.x + deltaX;
+      const newY = annotationStart.y + deltaY;
 
-      this.pdfService.updateAnnotation(this.draggedAnnotation.id, {
+      this.pdfService.updateAnnotation(dragged.id, {
         x: newX,
         y: newY,
       });
 
-      this.draggedAnnotation = { ...this.draggedAnnotation, x: newX, y: newY };
+      this.draggedAnnotation.set({ ...dragged, x: newX, y: newY });
     }
   };
 
@@ -926,12 +945,12 @@ export class PdfEditorComponent implements OnDestroy {
     document.removeEventListener('mousemove', this.onMouseMove);
     document.removeEventListener('mouseup', this.onMouseUp);
 
-    const annotation = this.draggedAnnotation;
-    const wasDragging = this.hasMoved;
+    const annotation = this.draggedAnnotation();
+    const wasDragging = this.hasMoved();
 
-    this.isDragging = false;
-    this.hasMoved = false;
-    this.draggedAnnotation = null;
+    this.isDragging.set(false);
+    this.hasMoved.set(false);
+    this.draggedAnnotation.set(null);
 
     if (!wasDragging && annotation) {
       this.selectedAnnotation.set(annotation);

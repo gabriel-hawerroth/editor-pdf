@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { PdfEditorComponent } from './components/pdf-editor/pdf-editor.component';
 
 @Component({
@@ -14,5 +14,6 @@ import { PdfEditorComponent } from './components/pdf-editor/pdf-editor.component
       }
     `,
   ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class App {}

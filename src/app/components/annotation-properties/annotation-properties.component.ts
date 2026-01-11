@@ -3,8 +3,9 @@ import {
   input,
   output,
   ElementRef,
-  ViewChild,
-  AfterViewChecked,
+  viewChild,
+  effect,
+  ChangeDetectionStrategy,
 } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
@@ -16,30 +17,36 @@ import { TextAnnotation, FontFamily } from '../../services/pdf.service';
   imports: [FormsModule],
   templateUrl: './annotation-properties.component.html',
   styleUrl: './annotation-properties.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class AnnotationPropertiesComponent implements AfterViewChecked {
-  @ViewChild('textInput') textInput!: ElementRef<HTMLInputElement>;
+export class AnnotationPropertiesComponent {
+  readonly textInput = viewChild<ElementRef<HTMLInputElement>>('textInput');
 
-  annotation = input.required<TextAnnotation | null>();
-  zoom = input.required<number>();
-  shouldFocus = input<boolean>(false);
+  readonly annotation = input.required<TextAnnotation | null>();
+  readonly zoom = input.required<number>();
+  readonly shouldFocus = input<boolean>(false);
 
-  textChange = output<string>();
-  fontSizeChange = output<number>();
-  colorChange = output<string>();
-  fontFamilyChange = output<FontFamily>();
-  toggleBold = output<void>();
-  toggleItalic = output<void>();
-  toggleUnderline = output<void>();
-  deleteAnnotation = output<void>();
-  focused = output<void>();
+  readonly textChange = output<string>();
+  readonly fontSizeChange = output<number>();
+  readonly colorChange = output<string>();
+  readonly fontFamilyChange = output<FontFamily>();
+  readonly toggleBold = output<void>();
+  readonly toggleItalic = output<void>();
+  readonly toggleUnderline = output<void>();
+  readonly deleteAnnotation = output<void>();
+  readonly focused = output<void>();
 
-  ngAfterViewChecked(): void {
-    if (this.shouldFocus() && this.textInput?.nativeElement) {
-      this.textInput.nativeElement.focus();
-      this.textInput.nativeElement.select();
-      this.focused.emit();
-    }
+  constructor() {
+    effect(() => {
+      const shouldFocus = this.shouldFocus();
+      const input = this.textInput();
+
+      if (shouldFocus && input?.nativeElement) {
+        input.nativeElement.focus();
+        input.nativeElement.select();
+        this.focused.emit();
+      }
+    });
   }
 
   onTextChange(event: Event): void {

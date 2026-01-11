@@ -1,4 +1,9 @@
-import { Component, input, output } from '@angular/core';
+import {
+  Component,
+  input,
+  output,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 
 import { PageThumbnailComponent } from '../page-thumbnail/page-thumbnail.component';
 import { TextAnnotation, PencilAnnotation } from '../../services/pdf.service';
@@ -14,6 +19,7 @@ export interface PageItem {
   imports: [PageThumbnailComponent],
   templateUrl: './pages-sidebar.component.html',
   styleUrl: './pages-sidebar.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class PagesSidebarComponent {
   isOpen = input.required<boolean>();

@@ -1,15 +1,15 @@
 import {
   Component,
   ElementRef,
-  Input,
-  ViewChild,
-  AfterViewInit,
+  viewChild,
+  effect,
+  signal,
+  input,
+  output,
+  inject,
+  ChangeDetectionStrategy,
+  untracked,
   OnDestroy,
-  Output,
-  EventEmitter,
-  OnChanges,
-  SimpleChanges,
-  HostBinding,
 } from '@angular/core';
 
 import {
@@ -24,40 +24,85 @@ import {
   imports: [],
   templateUrl: './page-thumbnail.component.html',
   styleUrls: ['./page-thumbnail.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    '[class.dragging]': 'isDragging()',
+  },
 })
-export class PageThumbnailComponent
-  implements AfterViewInit, OnDestroy, OnChanges
-{
-  @ViewChild('thumbnailCanvas') canvasRef!: ElementRef<HTMLCanvasElement>;
+export class PageThumbnailComponent implements OnDestroy {
+  private readonly pdfService = inject(PdfService);
+  private readonly elementRef = inject(ElementRef);
 
-  @Input() pageId: string = '';
-  @Input() pageNumber: number = 1;
-  @Input() isActive: boolean = false;
-  @Input() annotations: TextAnnotation[] = [];
-  @Input() pencilAnnotations: PencilAnnotation[] = [];
-  @Output() pageSelect = new EventEmitter<number>();
-  @Output() pageDrop = new EventEmitter<{
-    fromIndex: number;
-    toIndex: number;
-  }>();
+  // Signal-based ViewChild
+  readonly canvasRef =
+    viewChild<ElementRef<HTMLCanvasElement>>('thumbnailCanvas');
 
-  @HostBinding('class.dragging') isDragging = false;
-  isDragOver = false;
+  // Signal inputs
+  readonly pageId = input.required<string>();
+  readonly pageNumber = input.required<number>();
+  readonly isActive = input<boolean>(false);
+  readonly annotations = input<TextAnnotation[]>([]);
+  readonly pencilAnnotations = input<PencilAnnotation[]>([]);
 
-  isLoading = true;
+  // Signal outputs
+  readonly pageSelect = output<number>();
+  readonly pageDrop = output<{ fromIndex: number; toIndex: number }>();
+
+  // Signal-based state
+  readonly isDragging = signal(false);
+  readonly isDragOver = signal(false);
+  readonly isLoading = signal(true);
+
+  private readonly isRendered = signal(false);
+  private readonly lastRenderedPageId = signal('');
+  private readonly isRenderingInProgress = signal(false);
+  private pendingRender = false;
   private observer: IntersectionObserver | null = null;
-  private isRendered = false;
-  // Armazena o pageId que foi renderizado no canvas
-  private lastRenderedPageId = '';
+  private isVisible = false;
 
-  constructor(private pdfService: PdfService, private elementRef: ElementRef) {}
+  constructor() {
+    // Setup IntersectionObserver when canvas is available
+    effect(() => {
+      const canvas = this.canvasRef();
+      if (canvas && !this.observer) {
+        untracked(() => this.setupIntersectionObserver());
+      }
+    });
 
-  ngAfterViewInit(): void {
-    // Usar IntersectionObserver para lazy loading
+    // Unified effect for all render triggers
+    effect(() => {
+      const currentPageId = this.pageId();
+      const canvas = this.canvasRef();
+      // Track annotation changes
+      const annotations = this.annotations();
+      const pencilAnnotations = this.pencilAnnotations();
+
+      if (!canvas) return;
+
+      untracked(() => {
+        // Only render if visible (intersection observer will handle initial render)
+        if (!this.isVisible) return;
+
+        const needsFullRender = currentPageId !== this.lastRenderedPageId();
+        const needsAnnotationUpdate = this.isRendered() && !needsFullRender;
+
+        if (needsFullRender) {
+          this.isRendered.set(false);
+          this.isLoading.set(true);
+          this.renderThumbnail();
+        } else if (needsAnnotationUpdate) {
+          this.renderThumbnail();
+        }
+      });
+    });
+  }
+
+  private setupIntersectionObserver(): void {
     this.observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          if (entry.isIntersecting && !this.isRendered) {
+          this.isVisible = entry.isIntersecting;
+          if (entry.isIntersecting && !this.isRendered()) {
             this.renderThumbnail();
           }
         });
@@ -68,33 +113,6 @@ export class PageThumbnailComponent
     this.observer.observe(this.elementRef.nativeElement);
   }
 
-  ngOnChanges(changes: SimpleChanges): void {
-    // Se apenas o pageNumber mudou mas o pageId não mudou,
-    // significa que o componente foi reutilizado (mesmo conteúdo, posição diferente)
-    // Não precisamos re-renderizar porque o canvas já tem o conteúdo correto
-    if (changes['pageNumber'] && !changes['pageId']) {
-      // Apenas o número de exibição mudou, canvas já está correto
-      return;
-    }
-
-    // Se o pageId mudou, precisamos re-renderizar (novo conteúdo)
-    if (changes['pageId'] && !changes['pageId'].firstChange) {
-      if (this.pageId !== this.lastRenderedPageId && this.canvasRef) {
-        this.isRendered = false;
-        this.isLoading = true;
-        this.renderThumbnail();
-      }
-    }
-    // Re-renderizar quando as anotações mudarem
-    else if (
-      (changes['annotations'] || changes['pencilAnnotations']) &&
-      this.isRendered &&
-      this.canvasRef
-    ) {
-      this.renderThumbnail();
-    }
-  }
-
   ngOnDestroy(): void {
     if (this.observer) {
       this.observer.disconnect();
@@ -102,44 +120,62 @@ export class PageThumbnailComponent
   }
 
   private async renderThumbnail(): Promise<void> {
+    const canvas = this.canvasRef();
+    if (!canvas) return;
+
+    // Prevent concurrent renders on the same canvas
+    if (this.isRenderingInProgress()) {
+      this.pendingRender = true;
+      return;
+    }
+
+    this.isRenderingInProgress.set(true);
+
     try {
       await this.pdfService.renderThumbnailWithAnnotations(
-        this.pageNumber,
-        this.canvasRef.nativeElement,
+        this.pageNumber(),
+        canvas.nativeElement,
         140,
-        this.annotations,
-        this.pencilAnnotations
+        this.annotations(),
+        this.pencilAnnotations()
       );
-      this.isRendered = true;
-      this.lastRenderedPageId = this.pageId;
+      this.isRendered.set(true);
+      this.lastRenderedPageId.set(this.pageId());
     } catch (error) {
       console.error(
-        `Erro ao renderizar thumbnail da página ${this.pageNumber}:`,
+        `Erro ao renderizar thumbnail da página ${this.pageNumber()}:`,
         error
       );
     } finally {
-      this.isLoading = false;
+      this.isLoading.set(false);
+      this.isRenderingInProgress.set(false);
+
+      // If a render was requested while we were rendering, do it now
+      if (this.pendingRender) {
+        this.pendingRender = false;
+        this.renderThumbnail();
+      }
     }
   }
 
   onSelect(): void {
-    this.pageSelect.emit(this.pageNumber);
+    this.pageSelect.emit(this.pageNumber());
   }
 
   onDragStart(event: DragEvent): void {
-    this.isDragging = true;
+    this.isDragging.set(true);
     if (event.dataTransfer) {
       event.dataTransfer.effectAllowed = 'move';
       event.dataTransfer.setData(
         'text/plain',
-        (this.pageNumber - 1).toString()
+        (this.pageNumber() - 1).toString()
       );
     }
   }
 
-  onDragEnd(event: DragEvent): void {
-    this.isDragging = false;
-    this.isDragOver = false;
+  onDragEnd(): void {
+    this.isDragging.set(false);
+    this.isDragOver.set(false);
   }
 
   onDragOver(event: DragEvent): void {
@@ -147,20 +183,20 @@ export class PageThumbnailComponent
     if (event.dataTransfer) {
       event.dataTransfer.dropEffect = 'move';
     }
-    this.isDragOver = true;
+    this.isDragOver.set(true);
   }
 
-  onDragLeave(event: DragEvent): void {
-    this.isDragOver = false;
+  onDragLeave(): void {
+    this.isDragOver.set(false);
   }
 
   onDrop(event: DragEvent): void {
     event.preventDefault();
-    this.isDragOver = false;
+    this.isDragOver.set(false);
 
     if (event.dataTransfer) {
       const fromIndex = parseInt(event.dataTransfer.getData('text/plain'), 10);
-      const toIndex = this.pageNumber - 1;
+      const toIndex = this.pageNumber() - 1;
 
       if (fromIndex !== toIndex && !isNaN(fromIndex)) {
         this.pageDrop.emit({ fromIndex, toIndex });

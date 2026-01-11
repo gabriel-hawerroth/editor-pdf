@@ -1,15 +1,22 @@
-import { Component, output, ElementRef, ViewChild } from '@angular/core';
+import {
+  Component,
+  output,
+  ElementRef,
+  viewChild,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 
 @Component({
   selector: 'app-upload-area',
   standalone: true,
   templateUrl: './upload-area.component.html',
   styleUrl: './upload-area.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class UploadAreaComponent {
-  @ViewChild('fileInput') fileInput!: ElementRef<HTMLInputElement>;
+  readonly fileInput = viewChild<ElementRef<HTMLInputElement>>('fileInput');
 
-  fileSelected = output<File>();
+  readonly fileSelected = output<File>();
 
   onFileSelect(event: Event): void {
     const input = event.target as HTMLInputElement;
@@ -36,6 +43,9 @@ export class UploadAreaComponent {
   }
 
   openFileDialog(): void {
-    this.fileInput.nativeElement.click();
+    const input = this.fileInput();
+    if (input) {
+      input.nativeElement.click();
+    }
   }
 }

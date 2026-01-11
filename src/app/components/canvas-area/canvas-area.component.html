@@ -38,7 +38,7 @@
       <div
         class="text-annotation"
         [class.selected]="isSelected(annotation)"
-        [class.dragging]="isDragging && isSelected(annotation)"
+        [class.dragging]="isDragging() && isSelected(annotation)"
         [ngStyle]="getAnnotationStyle(annotation)"
         (mousedown)="onAnnotationMouseDown(annotation, $event)"
       >

@@ -1,102 +1,103 @@
 <div class="pdf-editor">
   <!-- Upload Area -->
   @if (!pdfLoaded()) {
-    <app-upload-area (fileSelected)="onFileSelected($event)" />
+  <app-upload-area (fileSelected)="onFileSelected($event)" />
   }
 
   <!-- Editor Area -->
   @if (pdfLoaded()) {
-    <div class="editor-container">
-      <!-- Toolbar -->
-      <app-editor-toolbar
-        [fileName]="fileName()"
-        [(selectedTool)]="selectedTool"
-        [zoom]="zoom()"
-        [totalPages]="totalPages()"
-        [isLoading]="isLoading()"
-        [(fontSize)]="fontSize"
-        [(textColor)]="textColor"
-        [(pencilColor)]="pencilColor"
-        [(pencilStrokeWidth)]="pencilStrokeWidth"
-        [(pencilOpacity)]="pencilOpacity"
-        [(eraserSize)]="eraserSize"
-        [eyedropperActive]="eyedropperActive()"
-        [eyedropperTarget]="eyedropperTarget()"
-        (resetEditor)="resetEditor()"
-        (addNewPage)="addNewPage()"
-        (removeCurrentPage)="removeCurrentPage()"
-        (rotatePageLeft)="rotatePageLeft()"
-        (rotatePageRight)="rotatePageRight()"
-        (flipPageVertical)="flipPageVertical()"
-        (flipPageHorizontal)="flipPageHorizontal()"
-        (zoomIn)="zoomIn()"
-        (zoomOut)="zoomOut()"
-        (downloadPdf)="downloadPdf()"
-        (openEyedropper)="openEyedropper($event)"
+  <div class="editor-container">
+    <!-- Toolbar -->
+    <app-editor-toolbar
+      [fileName]="fileName()"
+      [(selectedTool)]="selectedTool"
+      [zoom]="zoom()"
+      [totalPages]="totalPages()"
+      [isLoading]="isLoading()"
+      [(fontSize)]="fontSize"
+      [(textColor)]="textColor"
+      [(pencilColor)]="pencilColor"
+      [(pencilStrokeWidth)]="pencilStrokeWidth"
+      [(pencilOpacity)]="pencilOpacity"
+      [(eraserSize)]="eraserSize"
+      [eyedropperActive]="eyedropperActive()"
+      [eyedropperTarget]="eyedropperTarget()"
+      (resetEditor)="resetEditor()"
+      (addNewPage)="addNewPage()"
+      (removeCurrentPage)="removeCurrentPage()"
+      (rotatePageLeft)="rotatePageLeft()"
+      (rotatePageRight)="rotatePageRight()"
+      (flipPageVertical)="flipPageVertical()"
+      (flipPageHorizontal)="flipPageHorizontal()"
+      (zoomIn)="zoomIn()"
+      (zoomOut)="zoomOut()"
+      (downloadPdf)="downloadPdf()"
+      (openEyedropper)="openEyedropper($event)"
+    />
+
+    <!-- Main Content -->
+    <div class="main-content">
+      <!-- Pages Sidebar -->
+      <app-pages-sidebar
+        [isOpen]="showPagesSidebar()"
+        [pages]="pages()"
+        [currentPage]="currentPage()"
+        [annotationsByPage]="annotationsByPage()"
+        [pencilAnnotationsByPage]="pencilAnnotationsByPage()"
+        (closeSidebar)="togglePagesSidebar()"
+        (openSidebar)="togglePagesSidebar()"
+        (pageSelect)="goToPage($event)"
+        (pageReorder)="onPageReorder($event)"
       />
 
-      <!-- Main Content -->
-      <div class="main-content">
-        <!-- Pages Sidebar -->
-        <app-pages-sidebar
-          [isOpen]="showPagesSidebar()"
-          [pages]="pages()"
-          [currentPage]="currentPage()"
-          [annotationsByPage]="annotationsByPage()"
-          [pencilAnnotationsByPage]="pencilAnnotationsByPage()"
-          (closeSidebar)="togglePagesSidebar()"
-          (openSidebar)="togglePagesSidebar()"
-          (pageSelect)="goToPage($event)"
-          (pageReorder)="onPageReorder($event)"
-        />
+      <!-- Canvas Area -->
+      <app-canvas-area
+        [canvasWidth]="canvasWidth()"
+        [canvasHeight]="canvasHeight()"
+        [zoom]="zoom()"
+        [selectedTool]="selectedTool()"
+        [annotations]="annotations()"
+        [pencilAnnotations]="pencilAnnotations()"
+        [selectedAnnotation]="selectedAnnotation()"
+        [eyedropperActive]="eyedropperActive()"
+        [eraserSize]="eraserSize()"
+        [eraserCursorVisible]="eraserCursorVisible()"
+        [eraserCursorX]="eraserCursorX()"
+        [eraserCursorY]="eraserCursorY()"
+        [isDragging]="isDragging()"
+        (canvasReady)="onCanvasReady($event)"
+        (annotationLayerReady)="onAnnotationLayerReady($event)"
+        (canvasMouseDown)="onCanvasMouseDown($event)"
+        (annotationMouseDown)="onAnnotationMouseDown($event)"
+        (eraserCursorMove)="onEraserCursorMove($event)"
+        (eraserCursorLeave)="onEraserCursorLeave()"
+      />
 
-        <!-- Canvas Area -->
-        <app-canvas-area
-          [canvasWidth]="canvasWidth()"
-          [canvasHeight]="canvasHeight()"
-          [zoom]="zoom()"
-          [selectedTool]="selectedTool()"
-          [annotations]="annotations()"
-          [pencilAnnotations]="pencilAnnotations()"
-          [selectedAnnotation]="selectedAnnotation()"
-          [eyedropperActive]="eyedropperActive()"
-          [eraserSize]="eraserSize()"
-          [eraserCursorVisible]="eraserCursorVisible()"
-          [eraserCursorX]="eraserCursorX()"
-          [eraserCursorY]="eraserCursorY()"
-          (canvasReady)="onCanvasReady($event)"
-          (annotationLayerReady)="onAnnotationLayerReady($event)"
-          (canvasMouseDown)="onCanvasMouseDown($event)"
-          (annotationMouseDown)="onAnnotationMouseDown($event)"
-          (eraserCursorMove)="onEraserCursorMove($event)"
-          (eraserCursorLeave)="onEraserCursorLeave()"
-        />
-
-        <!-- Properties Panel -->
-        <app-annotation-properties
-          [annotation]="selectedAnnotation()"
-          [zoom]="zoom()"
-          [shouldFocus]="shouldFocusTextInput()"
-          (textChange)="updateAnnotationText($event)"
-          (fontSizeChange)="updateAnnotationFontSize($event)"
-          (colorChange)="updateAnnotationColor($event)"
-          (fontFamilyChange)="updateAnnotationFontFamily($event)"
-          (toggleBold)="toggleAnnotationBold()"
-          (toggleItalic)="toggleAnnotationItalic()"
-          (toggleUnderline)="toggleAnnotationUnderline()"
-          (deleteAnnotation)="deleteSelectedAnnotation()"
-          (focused)="onAnnotationFocused()"
-        />
-      </div>
-
-      <!-- Page Navigation -->
-      <app-page-navigation
-        [currentPage]="currentPage()"
-        [totalPages]="totalPages()"
-        (previousPage)="previousPage()"
-        (nextPage)="nextPage()"
+      <!-- Properties Panel -->
+      <app-annotation-properties
+        [annotation]="selectedAnnotation()"
+        [zoom]="zoom()"
+        [shouldFocus]="shouldFocusTextInput()"
+        (textChange)="updateAnnotationText($event)"
+        (fontSizeChange)="updateAnnotationFontSize($event)"
+        (colorChange)="updateAnnotationColor($event)"
+        (fontFamilyChange)="updateAnnotationFontFamily($event)"
+        (toggleBold)="toggleAnnotationBold()"
+        (toggleItalic)="toggleAnnotationItalic()"
+        (toggleUnderline)="toggleAnnotationUnderline()"
+        (deleteAnnotation)="deleteSelectedAnnotation()"
+        (focused)="onAnnotationFocused()"
       />
     </div>
+
+    <!-- Page Navigation -->
+    <app-page-navigation
+      [currentPage]="currentPage()"
+      [totalPages]="totalPages()"
+      (previousPage)="previousPage()"
+      (nextPage)="nextPage()"
+    />
+  </div>
   }
 
   <!-- Loading Overlay -->

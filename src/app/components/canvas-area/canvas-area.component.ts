@@ -1,12 +1,14 @@
 import {
   Component,
   ElementRef,
-  ViewChild,
+  viewChild,
   input,
   output,
-  AfterViewInit,
-  OnChanges,
-  SimpleChanges,
+  effect,
+  inject,
+  Injector,
+  afterNextRender,
+  ChangeDetectionStrategy,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { TextAnnotation, PencilAnnotation } from '../../services/pdf.service';
@@ -19,59 +21,65 @@ export type Tool = 'select' | 'text' | 'pencil' | 'eraser';
   imports: [CommonModule],
   templateUrl: './canvas-area.component.html',
   styleUrl: './canvas-area.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class CanvasAreaComponent implements AfterViewInit, OnChanges {
-  @ViewChild('pdfCanvas') pdfCanvas!: ElementRef<HTMLCanvasElement>;
-  @ViewChild('annotationLayer') annotationLayer!: ElementRef<HTMLDivElement>;
+export class CanvasAreaComponent {
+  private readonly injector = inject(Injector);
+
+  // Signal-based ViewChild
+  readonly pdfCanvas = viewChild<ElementRef<HTMLCanvasElement>>('pdfCanvas');
+  readonly annotationLayer =
+    viewChild<ElementRef<HTMLDivElement>>('annotationLayer');
 
   // Inputs
-  canvasWidth = input.required<number>();
-  canvasHeight = input.required<number>();
-  zoom = input.required<number>();
-  selectedTool = input.required<Tool>();
-  annotations = input.required<TextAnnotation[]>();
-  pencilAnnotations = input.required<PencilAnnotation[]>();
-  selectedAnnotation = input<TextAnnotation | null>(null);
-  eyedropperActive = input<boolean>(false);
-  eraserSize = input<number>(20);
-  eraserCursorVisible = input<boolean>(false);
-  eraserCursorX = input<number>(0);
-  eraserCursorY = input<number>(0);
+  readonly canvasWidth = input.required<number>();
+  readonly canvasHeight = input.required<number>();
+  readonly zoom = input.required<number>();
+  readonly selectedTool = input.required<Tool>();
+  readonly annotations = input.required<TextAnnotation[]>();
+  readonly pencilAnnotations = input.required<PencilAnnotation[]>();
+  readonly selectedAnnotation = input<TextAnnotation | null>(null);
+  readonly eyedropperActive = input<boolean>(false);
+  readonly eraserSize = input<number>(20);
+  readonly eraserCursorVisible = input<boolean>(false);
+  readonly eraserCursorX = input<number>(0);
+  readonly eraserCursorY = input<number>(0);
+  readonly isDragging = input<boolean>(false);
 
   // Outputs
-  canvasReady = output<HTMLCanvasElement>();
-  annotationLayerReady = output<HTMLDivElement>();
-  canvasMouseDown = output<MouseEvent>();
-  annotationMouseDown = output<{
+  readonly canvasReady = output<HTMLCanvasElement>();
+  readonly annotationLayerReady = output<HTMLDivElement>();
+  readonly canvasMouseDown = output<MouseEvent>();
+  readonly annotationMouseDown = output<{
     annotation: TextAnnotation;
     event: MouseEvent;
   }>();
-  eraserCursorMove = output<MouseEvent>();
-  eraserCursorLeave = output<void>();
+  readonly eraserCursorMove = output<MouseEvent>();
+  readonly eraserCursorLeave = output<void>();
 
-  isDragging = false;
+  constructor() {
+    // Emit canvas refs when dimensions change
+    effect(() => {
+      // Track dimension changes
+      this.canvasWidth();
+      this.canvasHeight();
 
-  ngAfterViewInit(): void {
-    if (this.pdfCanvas) {
-      this.canvasReady.emit(this.pdfCanvas.nativeElement);
-    }
-    if (this.annotationLayer) {
-      this.annotationLayerReady.emit(this.annotationLayer.nativeElement);
-    }
-  }
+      // After render, emit the element references
+      afterNextRender(
+        () => {
+          const canvas = this.pdfCanvas();
+          const layer = this.annotationLayer();
 
-  ngOnChanges(changes: SimpleChanges): void {
-    // Re-emit canvas when it becomes available
-    if (changes['canvasWidth'] || changes['canvasHeight']) {
-      setTimeout(() => {
-        if (this.pdfCanvas) {
-          this.canvasReady.emit(this.pdfCanvas.nativeElement);
-        }
-        if (this.annotationLayer) {
-          this.annotationLayerReady.emit(this.annotationLayer.nativeElement);
-        }
-      }, 0);
-    }
+          if (canvas) {
+            this.canvasReady.emit(canvas.nativeElement);
+          }
+          if (layer) {
+            this.annotationLayerReady.emit(layer.nativeElement);
+          }
+        },
+        { injector: this.injector }
+      );
+    });
   }
 
   onCanvasMouseDown(event: MouseEvent): void {

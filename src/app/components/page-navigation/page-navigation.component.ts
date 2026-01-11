@@ -1,5 +1,9 @@
-import { Component, input, output } from '@angular/core';
-
+import {
+  Component,
+  input,
+  output,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 
 @Component({
   selector: 'app-page-navigation',
@@ -7,6 +11,7 @@ import { Component, input, output } from '@angular/core';
   imports: [],
   templateUrl: './page-navigation.component.html',
   styleUrl: './page-navigation.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class PageNavigationComponent {
   currentPage = input.required<number>();

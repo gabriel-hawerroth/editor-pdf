@@ -1,4 +1,10 @@
-import { Component, input, output, model } from '@angular/core';
+import {
+  Component,
+  input,
+  output,
+  model,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
 
@@ -10,6 +16,7 @@ export type Tool = 'select' | 'text' | 'pencil' | 'eraser';
   imports: [FormsModule],
   templateUrl: './editor-toolbar.component.html',
   styleUrl: './editor-toolbar.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class EditorToolbarComponent {
   // Inputs
