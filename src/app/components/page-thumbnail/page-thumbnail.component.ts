@@ -11,7 +11,7 @@ import {
   SimpleChanges,
   HostBinding,
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import {
   PdfService,
   TextAnnotation,
@@ -21,7 +21,7 @@ import {
 @Component({
   selector: 'app-page-thumbnail',
   standalone: true,
-  imports: [CommonModule],
+  imports: [],
   templateUrl: './page-thumbnail.component.html',
   styleUrls: ['./page-thumbnail.component.scss'],
 })

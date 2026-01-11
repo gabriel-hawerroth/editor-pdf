@@ -6,14 +6,14 @@ import {
   ViewChild,
   AfterViewChecked,
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 import { TextAnnotation, FontFamily } from '../../services/pdf.service';
 
 @Component({
   selector: 'app-annotation-properties',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   templateUrl: './annotation-properties.component.html',
   styleUrl: './annotation-properties.component.scss',
 })

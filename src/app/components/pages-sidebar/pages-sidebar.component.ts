@@ -1,5 +1,5 @@
 import { Component, input, output } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { PageThumbnailComponent } from '../page-thumbnail/page-thumbnail.component';
 import { TextAnnotation, PencilAnnotation } from '../../services/pdf.service';
 
@@ -11,7 +11,7 @@ export interface PageItem {
 @Component({
   selector: 'app-pages-sidebar',
   standalone: true,
-  imports: [CommonModule, PageThumbnailComponent],
+  imports: [PageThumbnailComponent],
   templateUrl: './pages-sidebar.component.html',
   styleUrl: './pages-sidebar.component.scss',
 })

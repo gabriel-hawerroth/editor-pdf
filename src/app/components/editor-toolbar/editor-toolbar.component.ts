@@ -1,5 +1,5 @@
 import { Component, input, output, model } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 
 export type Tool = 'select' | 'text' | 'pencil' | 'eraser';
@@ -7,7 +7,7 @@ export type Tool = 'select' | 'text' | 'pencil' | 'eraser';
 @Component({
   selector: 'app-editor-toolbar',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   templateUrl: './editor-toolbar.component.html',
   styleUrl: './editor-toolbar.component.scss',
 })

@@ -1,10 +1,10 @@
 import { Component, input, output } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 
 @Component({
   selector: 'app-page-navigation',
   standalone: true,
-  imports: [CommonModule],
+  imports: [],
   templateUrl: './page-navigation.component.html',
   styleUrl: './page-navigation.component.scss',
 })

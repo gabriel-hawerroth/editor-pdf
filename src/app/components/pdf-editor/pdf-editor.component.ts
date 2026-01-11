@@ -6,7 +6,7 @@ import {
   HostListener,
   OnDestroy,
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import {
   PdfService,
   TextAnnotation,
@@ -27,15 +27,14 @@ import { LoadingOverlayComponent } from '../loading-overlay/loading-overlay.comp
   selector: 'app-pdf-editor',
   standalone: true,
   imports: [
-    CommonModule,
     UploadAreaComponent,
     EditorToolbarComponent,
     PagesSidebarComponent,
     CanvasAreaComponent,
     AnnotationPropertiesComponent,
     PageNavigationComponent,
-    LoadingOverlayComponent,
-  ],
+    LoadingOverlayComponent
+],
   templateUrl: './pdf-editor.component.html',
   styleUrl: './pdf-editor.component.scss',
 })
