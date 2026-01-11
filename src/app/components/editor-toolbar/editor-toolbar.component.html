@@ -1,0 +1,409 @@
+<div class="toolbar">
+  <div class="toolbar-section">
+    <button
+      class="btn btn-icon"
+      (click)="resetEditor.emit()"
+      title="Novo arquivo"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M12 4v16m8-8H4"
+        />
+      </svg>
+    </button>
+    <span class="file-name">{{ fileName() }}</span>
+  </div>
+
+  <div class="toolbar-section tools">
+    <button
+      class="btn btn-tool"
+      [class.active]="selectedTool() === 'select'"
+      (click)="selectTool('select')"
+      title="Selecionar"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"
+        />
+      </svg>
+    </button>
+    <button
+      class="btn btn-tool"
+      [class.active]="selectedTool() === 'text'"
+      (click)="selectTool('text')"
+      title="Adicionar texto"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+        />
+      </svg>
+    </button>
+    <button
+      class="btn btn-tool"
+      [class.active]="selectedTool() === 'pencil'"
+      (click)="selectTool('pencil')"
+      title="Lápis"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+        />
+      </svg>
+    </button>
+    <button
+      class="btn btn-tool"
+      [class.active]="selectedTool() === 'eraser'"
+      (click)="selectTool('eraser')"
+      title="Borracha"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M5.586 15.465l4.95 4.95a2 2 0 002.828 0l8.485-8.485a2 2 0 000-2.829l-4.95-4.95a2 2 0 00-2.828 0L5.586 12.636a2 2 0 000 2.829zM3 21h18M9.5 13.5l5 5"
+        />
+      </svg>
+    </button>
+    <button
+      class="btn btn-tool"
+      (click)="addNewPage.emit()"
+      title="Adicionar nova página"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+        />
+      </svg>
+    </button>
+    <button
+      class="btn btn-tool btn-danger"
+      (click)="removeCurrentPage.emit()"
+      [disabled]="totalPages() <= 1"
+      title="Remover página atual"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M9 13h6m5 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+        />
+      </svg>
+    </button>
+  </div>
+
+  <!-- Text Options -->
+  <div
+    class="toolbar-section text-options"
+    [class.hidden]="selectedTool() !== 'text'"
+  >
+    <label>
+      Tamanho:
+      <input
+        type="number"
+        [ngModel]="fontSize()"
+        (ngModelChange)="fontSize.set($event)"
+        min="8"
+        max="72"
+        class="input-small"
+      />
+    </label>
+    <label>
+      Cor:
+      <input
+        type="color"
+        [ngModel]="textColor()"
+        (ngModelChange)="textColor.set($event)"
+        class="input-color"
+      />
+      <button
+        class="btn btn-icon btn-eyedropper"
+        [class.active]="eyedropperActive() && eyedropperTarget() === 'text'"
+        (click)="onEyedropper('text')"
+        title="Conta-gotas - clique para capturar cor do PDF"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path
+            d="M21.17 2.83a2.83 2.83 0 0 0-4 0l-1.41 1.41-3.54-3.54a1 1 0 0 0-1.41 0L9.39 2.12a1 1 0 0 0 0 1.41L12.93 7l-8.1 8.1a2 2 0 0 0-.59 1.42V19a2 2 0 0 0 2 2h2.48a2 2 0 0 0 1.42-.59L18.24 12l3.54 3.54a1 1 0 0 0 1.41 0l1.41-1.41a1 1 0 0 0 0-1.41l-3.54-3.54 1.41-1.41a2.83 2.83 0 0 0 0-4z"
+          />
+          <path d="M6 21v-2" />
+        </svg>
+      </button>
+    </label>
+  </div>
+
+  <!-- Pencil Options -->
+  <div
+    class="toolbar-section pencil-options"
+    [class.hidden]="selectedTool() !== 'pencil'"
+  >
+    <label>
+      Cor:
+      <input
+        type="color"
+        [ngModel]="pencilColor()"
+        (ngModelChange)="pencilColor.set($event)"
+        class="input-color"
+      />
+      <button
+        class="btn btn-icon btn-eyedropper"
+        [class.active]="eyedropperActive() && eyedropperTarget() === 'pencil'"
+        (click)="onEyedropper('pencil')"
+        title="Conta-gotas - clique para capturar cor do PDF"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path
+            d="M21.17 2.83a2.83 2.83 0 0 0-4 0l-1.41 1.41-3.54-3.54a1 1 0 0 0-1.41 0L9.39 2.12a1 1 0 0 0 0 1.41L12.93 7l-8.1 8.1a2 2 0 0 0-.59 1.42V19a2 2 0 0 0 2 2h2.48a2 2 0 0 0 1.42-.59L18.24 12l3.54 3.54a1 1 0 0 0 1.41 0l1.41-1.41a1 1 0 0 0 0-1.41l-3.54-3.54 1.41-1.41a2.83 2.83 0 0 0 0-4z"
+          />
+          <path d="M6 21v-2" />
+        </svg>
+      </button>
+    </label>
+    <label>
+      Espessura:
+      <input
+        type="range"
+        [ngModel]="pencilStrokeWidth()"
+        (ngModelChange)="pencilStrokeWidth.set($event)"
+        min="1"
+        max="20"
+        class="input-range"
+      />
+      <span class="range-value">{{ pencilStrokeWidth() }}px</span>
+    </label>
+    <label>
+      Opacidade:
+      <input
+        type="range"
+        [ngModel]="pencilOpacity() * 100"
+        (ngModelChange)="pencilOpacity.set($event / 100)"
+        min="10"
+        max="100"
+        class="input-range"
+      />
+      <span class="range-value">{{ (pencilOpacity() * 100).toFixed(0) }}%</span>
+    </label>
+  </div>
+
+  <!-- Eraser Options -->
+  <div
+    class="toolbar-section eraser-options"
+    [class.hidden]="selectedTool() !== 'eraser'"
+  >
+    <label>
+      Tamanho:
+      <input
+        type="range"
+        [ngModel]="eraserSize()"
+        (ngModelChange)="eraserSize.set($event)"
+        min="10"
+        max="50"
+        class="input-range"
+      />
+      <span class="range-value">{{ eraserSize() }}px</span>
+    </label>
+  </div>
+
+  <!-- Page Orientation -->
+  <div class="toolbar-section page-orientation">
+    <button
+      class="btn btn-tool"
+      (click)="rotatePageLeft.emit()"
+      title="Girar para esquerda"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M3 10h10a4 4 0 014 4v0a4 4 0 01-4 4H3m0 0l4-4m-4 4l4 4"
+        />
+      </svg>
+    </button>
+    <button
+      class="btn btn-tool"
+      (click)="rotatePageRight.emit()"
+      title="Girar para direita"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M21 10H11a4 4 0 00-4 4v0a4 4 0 004 4h10m0 0l-4-4m4 4l-4 4"
+        />
+      </svg>
+    </button>
+    <button
+      class="btn btn-tool"
+      (click)="flipPageVertical.emit()"
+      title="Inverter verticalmente"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
+        />
+      </svg>
+    </button>
+    <button
+      class="btn btn-tool"
+      (click)="flipPageHorizontal.emit()"
+      title="Inverter horizontalmente"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
+        />
+      </svg>
+    </button>
+  </div>
+
+  <!-- Zoom Controls -->
+  <div class="toolbar-section zoom-controls">
+    <button class="btn btn-icon" (click)="zoomOut.emit()" title="Diminuir zoom">
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M20 12H4"
+        />
+      </svg>
+    </button>
+    <span class="zoom-level">{{ (zoom() * 100).toFixed(0) }}%</span>
+    <button class="btn btn-icon" (click)="zoomIn.emit()" title="Aumentar zoom">
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M12 4v16m8-8H4"
+        />
+      </svg>
+    </button>
+  </div>
+
+  <!-- Download Button -->
+  <div class="toolbar-section">
+    <button
+      class="btn btn-primary"
+      (click)="downloadPdf.emit()"
+      [disabled]="isLoading()"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+        />
+      </svg>
+      Baixar PDF
+    </button>
+  </div>
+</div>

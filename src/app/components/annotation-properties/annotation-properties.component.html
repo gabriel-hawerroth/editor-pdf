@@ -1,0 +1,100 @@
+@if (annotation()) {
+<div class="properties-panel">
+  <h3>Propriedades do Texto</h3>
+
+  <div class="property-group">
+    <label>Texto:</label>
+    <input
+      #textInput
+      type="text"
+      [value]="annotation()?.text"
+      (input)="onTextChange($event)"
+      class="input-full"
+    />
+  </div>
+
+  <div class="property-group">
+    <label>Fonte:</label>
+    <select
+      [value]="annotation()?.fontFamily || 'Arial'"
+      (change)="onFontFamilyChange($event)"
+      class="input-full"
+    >
+      <option value="Arial">Arial</option>
+      <option value="Times New Roman">Times New Roman</option>
+      <option value="Courier New">Courier New</option>
+      <option value="Georgia">Georgia</option>
+      <option value="Verdana">Verdana</option>
+    </select>
+  </div>
+
+  <div class="property-group">
+    <label>Tamanho:</label>
+    <input
+      type="number"
+      [value]="getDisplayFontSize()"
+      (input)="onFontSizeChange($event)"
+      min="8"
+      max="72"
+      class="input-full"
+    />
+  </div>
+
+  <div class="property-group">
+    <label>Cor:</label>
+    <input
+      type="color"
+      [value]="annotation()?.color"
+      (input)="onColorChange($event)"
+      class="input-full"
+    />
+  </div>
+
+  <div class="property-group">
+    <label>Estilo:</label>
+    <div class="style-buttons">
+      <button
+        class="btn btn-style"
+        [class.active]="annotation()?.bold"
+        (click)="toggleBold.emit()"
+        title="Negrito"
+      >
+        <strong>B</strong>
+      </button>
+      <button
+        class="btn btn-style"
+        [class.active]="annotation()?.italic"
+        (click)="toggleItalic.emit()"
+        title="Itálico"
+      >
+        <em>I</em>
+      </button>
+      <button
+        class="btn btn-style"
+        [class.active]="annotation()?.underline"
+        (click)="toggleUnderline.emit()"
+        title="Sublinhado"
+      >
+        <u>U</u>
+      </button>
+    </div>
+  </div>
+
+  <button class="btn btn-danger" (click)="deleteAnnotation.emit()">
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+    >
+      <path
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="2"
+        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+      />
+    </svg>
+    Excluir
+  </button>
+</div>
+}

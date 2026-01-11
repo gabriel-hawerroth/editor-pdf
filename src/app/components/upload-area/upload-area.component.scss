@@ -1,0 +1,49 @@
+$primary-color: #4f46e5;
+$border-color: #e5e7eb;
+$text-primary: #111827;
+$text-secondary: #6b7280;
+
+:host {
+  display: flex;
+  flex: 1;
+}
+
+.upload-area {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 2rem;
+  border: 3px dashed $border-color;
+  border-radius: 1rem;
+  background-color: white;
+  cursor: pointer;
+  transition: all 0.3s ease;
+
+  &:hover {
+    border-color: $primary-color;
+    background-color: rgba($primary-color, 0.02);
+  }
+
+  .upload-content {
+    text-align: center;
+    color: $text-secondary;
+
+    .upload-icon {
+      width: 4rem;
+      height: 4rem;
+      margin-bottom: 1rem;
+      color: $primary-color;
+    }
+
+    h2 {
+      font-size: 1.5rem;
+      color: $text-primary;
+      margin-bottom: 0.5rem;
+    }
+
+    p {
+      font-size: 1rem;
+    }
+  }
+}

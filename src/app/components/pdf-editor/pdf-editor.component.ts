@@ -1,39 +1,45 @@
 import {
   Component,
   ElementRef,
-  ViewChild,
   signal,
   computed,
-  AfterViewChecked,
   HostListener,
   OnDestroy,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
 import {
   PdfService,
   TextAnnotation,
   FontFamily,
   PencilAnnotation,
 } from '../../services/pdf.service';
-import { PageThumbnailComponent } from '../page-thumbnail/page-thumbnail.component';
 
-type Tool = 'select' | 'text' | 'pencil' | 'eraser';
+// Components
+import { UploadAreaComponent } from '../upload-area/upload-area.component';
+import { EditorToolbarComponent, Tool } from '../editor-toolbar/editor-toolbar.component';
+import { PagesSidebarComponent, PageItem } from '../pages-sidebar/pages-sidebar.component';
+import { CanvasAreaComponent } from '../canvas-area/canvas-area.component';
+import { AnnotationPropertiesComponent } from '../annotation-properties/annotation-properties.component';
+import { PageNavigationComponent } from '../page-navigation/page-navigation.component';
+import { LoadingOverlayComponent } from '../loading-overlay/loading-overlay.component';
 
 @Component({
   selector: 'app-pdf-editor',
   standalone: true,
-  imports: [CommonModule, FormsModule, PageThumbnailComponent],
+  imports: [
+    CommonModule,
+    UploadAreaComponent,
+    EditorToolbarComponent,
+    PagesSidebarComponent,
+    CanvasAreaComponent,
+    AnnotationPropertiesComponent,
+    PageNavigationComponent,
+    LoadingOverlayComponent,
+  ],
   templateUrl: './pdf-editor.component.html',
   styleUrl: './pdf-editor.component.scss',
 })
-export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
-  @ViewChild('fileInput') fileInput!: ElementRef<HTMLInputElement>;
-  @ViewChild('pdfCanvas') pdfCanvas!: ElementRef<HTMLCanvasElement>;
-  @ViewChild('annotationLayer') annotationLayer!: ElementRef<HTMLDivElement>;
-  @ViewChild('textInput') textInput!: ElementRef<HTMLInputElement>;
-  @ViewChild('canvasWrapper') canvasWrapper!: ElementRef<HTMLDivElement>;
-
+export class PdfEditorComponent implements OnDestroy {
   // Estado reativo
   pdfLoaded = signal(false);
   currentPage = signal(1);
@@ -78,10 +84,14 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
   private dragStartY = 0;
   private dragAnnotationStartX = 0;
   private dragAnnotationStartY = 0;
-  private shouldFocusTextInput = false;
+  shouldFocusTextInput = signal(false);
 
   // Sidebar de páginas
   showPagesSidebar = signal(true);
+
+  // Canvas e annotation layer refs
+  private pdfCanvas: HTMLCanvasElement | null = null;
+  private annotationLayerElement: HTMLDivElement | null = null;
 
   // Usando computed com o signal do serviço para reatividade
   annotations = computed(() =>
@@ -98,19 +108,18 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
   );
 
   // Array de páginas com IDs únicos para tracking otimizado
-  pages = computed(() =>
+  pages = computed<PageItem[]>(() =>
     this.pdfService.pageIds().map((id, index) => ({
       id,
       displayNumber: index + 1,
     }))
   );
 
-  // Snapshot de anotações para thumbnails - só atualiza em momentos específicos
-  // (quando sidebar fecha, drag termina, ou PDF é carregado)
+  // Snapshot de anotações para thumbnails
   private thumbnailAnnotationsSnapshot = signal<TextAnnotation[]>([]);
   private thumbnailPencilAnnotationsSnapshot = signal<PencilAnnotation[]>([]);
 
-  // Mapa de anotações por página para os thumbnails (baseado no snapshot)
+  // Mapa de anotações por página para os thumbnails
   annotationsByPage = computed(() => {
     const map = new Map<number, TextAnnotation[]>();
     for (const annotation of this.thumbnailAnnotationsSnapshot()) {
@@ -131,7 +140,6 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
     return map;
   });
 
-  // Método para atualizar snapshot dos thumbnails
   private updateThumbnailSnapshot(): void {
     this.thumbnailAnnotationsSnapshot.set([...this.pdfService.annotations()]);
     this.thumbnailPencilAnnotationsSnapshot.set([
@@ -139,7 +147,6 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
     ]);
   }
 
-  // Método centralizado para fechar sidebar e atualizar thumbnails
   private closeEditSidebar(): void {
     if (this.selectedAnnotation() !== null) {
       this.selectedAnnotation.set(null);
@@ -149,12 +156,10 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
 
   constructor(private pdfService: PdfService) {}
 
-  // Interceptar Ctrl+Scroll para zoom customizado
   @HostListener('wheel', ['$event'])
   onWheel(event: WheelEvent): void {
     if (event.ctrlKey && this.pdfLoaded()) {
       event.preventDefault();
-
       if (event.deltaY < 0) {
         this.zoomIn();
       } else {
@@ -163,44 +168,21 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
     }
   }
 
-  ngAfterViewChecked(): void {
-    // Auto focus no campo de texto após adicionar uma anotação
-    if (this.shouldFocusTextInput && this.textInput?.nativeElement) {
-      this.textInput.nativeElement.focus();
-      this.textInput.nativeElement.select();
-      this.shouldFocusTextInput = false;
-    }
-  }
-
   ngOnDestroy(): void {
-    // Cleanup se necessário
+    // Cleanup
   }
 
-  onFileSelect(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    if (input.files && input.files[0]) {
-      this.loadPdf(input.files[0]);
-    }
+  // Canvas handlers
+  onCanvasReady(canvas: HTMLCanvasElement): void {
+    this.pdfCanvas = canvas;
   }
 
-  onDrop(event: DragEvent): void {
-    event.preventDefault();
-    event.stopPropagation();
-
-    if (event.dataTransfer?.files && event.dataTransfer.files[0]) {
-      const file = event.dataTransfer.files[0];
-      if (file.type === 'application/pdf') {
-        this.loadPdf(file);
-      }
-    }
+  onAnnotationLayerReady(layer: HTMLDivElement): void {
+    this.annotationLayerElement = layer;
   }
 
-  onDragOver(event: DragEvent): void {
-    event.preventDefault();
-    event.stopPropagation();
-  }
-
-  async loadPdf(file: File): Promise<void> {
+  // File handling
+  async onFileSelected(file: File): Promise<void> {
     this.isLoading.set(true);
     this.fileName.set(file.name);
 
@@ -211,7 +193,6 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
       this.pdfLoaded.set(true);
       this.updateThumbnailSnapshot();
 
-      // Aguardar o próximo ciclo para garantir que o canvas está no DOM
       setTimeout(() => this.renderCurrentPage(), 0);
     } catch (error) {
       console.error('Erro ao carregar PDF:', error);
@@ -227,19 +208,19 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
     try {
       const dimensions = await this.pdfService.renderPage(
         this.currentPage(),
-        this.pdfCanvas.nativeElement,
+        this.pdfCanvas,
         this.zoom()
       );
       this.canvasWidth.set(dimensions.width);
       this.canvasHeight.set(dimensions.height);
 
-      // Desenhar anotações de lápis após renderizar a página
       this.drawAllPencilAnnotations();
     } catch (error) {
       console.error('Erro ao renderizar página:', error);
     }
   }
 
+  // Navigation
   previousPage(): void {
     if (this.currentPage() > 1) {
       this.currentPage.update((p) => p - 1);
@@ -268,6 +249,7 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
     this.showPagesSidebar.update((v) => !v);
   }
 
+  // Page operations
   async addNewPage(): Promise<void> {
     if (!this.pdfLoaded()) return;
 
@@ -275,7 +257,6 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
     try {
       const newPageNumber = await this.pdfService.addNewPage();
       this.totalPages.set(newPageNumber);
-      // Navegar para a nova página
       this.currentPage.set(newPageNumber);
       this.selectedAnnotation.set(null);
       this.updateThumbnailSnapshot();
@@ -302,7 +283,6 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
       const newTotalPages = await this.pdfService.removePage(pageToRemove);
       this.totalPages.set(newTotalPages);
 
-      // Ajustar página atual se necessário
       if (this.currentPage() > newTotalPages) {
         this.currentPage.set(newTotalPages);
       }
@@ -382,34 +362,25 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
     }
   }
 
-  async onPageReorder(event: {
-    fromIndex: number;
-    toIndex: number;
-  }): Promise<void> {
+  async onPageReorder(event: { fromIndex: number; toIndex: number }): Promise<void> {
     if (!this.pdfLoaded()) return;
 
     this.isLoading.set(true);
     try {
       const { fromIndex, toIndex } = event;
-
-      // Calcular a nova posição da página atual após a reordenação
       const currentPageIndex = this.currentPage() - 1;
       let newCurrentPage = this.currentPage();
 
       if (currentPageIndex === fromIndex) {
-        // A página atual está sendo movida
         newCurrentPage = toIndex + 1;
       } else if (fromIndex < currentPageIndex && toIndex >= currentPageIndex) {
-        // Uma página antes da atual foi movida para depois
         newCurrentPage = this.currentPage() - 1;
       } else if (fromIndex > currentPageIndex && toIndex <= currentPageIndex) {
-        // Uma página depois da atual foi movida para antes
         newCurrentPage = this.currentPage() + 1;
       }
 
       await this.pdfService.movePage(fromIndex, toIndex);
 
-      // Atualizar a página atual
       this.currentPage.set(newCurrentPage);
       this.selectedAnnotation.set(null);
       this.updateThumbnailSnapshot();
@@ -422,6 +393,7 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
     }
   }
 
+  // Zoom
   zoomIn(): void {
     this.zoom.update((z) => Math.min(z + 0.25, 3));
     this.renderCurrentPage();
@@ -432,6 +404,7 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
     this.renderCurrentPage();
   }
 
+  // Tool selection
   selectTool(tool: Tool): void {
     this.selectedTool.set(tool);
     if (tool === 'text') {
@@ -439,10 +412,10 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
     }
   }
 
+  // Eyedropper
   async openEyedropper(target: 'text' | 'pencil'): Promise<void> {
     this.eyedropperTarget.set(target);
 
-    // Tentar usar a API nativa EyeDropper primeiro
     if ('EyeDropper' in window) {
       try {
         const eyeDropper = new (window as any).EyeDropper();
@@ -451,12 +424,10 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
         this.applyEyedropperColor(color);
         return;
       } catch (e) {
-        // Usuário cancelou ou erro - tentar modo alternativo
         console.log('EyeDropper nativo falhou, usando modo alternativo');
       }
     }
 
-    // Modo alternativo: ativar modo de captura no canvas
     this.previousTool.set(this.selectedTool());
     this.eyedropperActive.set(true);
   }
@@ -466,7 +437,6 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
 
     if (target === 'text') {
       this.textColor.set(color);
-      // Se há uma anotação selecionada, atualizar a cor dela também
       const selected = this.selectedAnnotation();
       if (selected) {
         this.pdfService.updateAnnotation(selected.id, { color });
@@ -477,7 +447,6 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
     }
 
     this.eyedropperActive.set(false);
-    // Restaurar a ferramenta anterior
     this.selectedTool.set(this.previousTool());
   }
 
@@ -489,7 +458,7 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
   private getColorFromCanvas(event: MouseEvent): string | null {
     if (!this.pdfCanvas) return null;
 
-    const canvas = this.pdfCanvas.nativeElement;
+    const canvas = this.pdfCanvas;
     const context = canvas.getContext('2d');
     if (!context) return null;
 
@@ -505,8 +474,8 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
     return color;
   }
 
+  // Canvas mouse events
   onCanvasMouseDown(event: MouseEvent): void {
-    // Verificar se o conta-gotas está ativo
     if (this.eyedropperActive()) {
       const color = this.getColorFromCanvas(event);
       if (color) {
@@ -516,7 +485,9 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
     }
 
     if (this.selectedTool() === 'text') {
-      const rect = this.annotationLayer.nativeElement.getBoundingClientRect();
+      if (!this.annotationLayerElement) return;
+
+      const rect = this.annotationLayerElement.getBoundingClientRect();
       const x = (event.clientX - rect.left) / this.zoom();
       const y = (event.clientY - rect.top) / this.zoom();
 
@@ -535,23 +506,36 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
 
       this.selectedAnnotation.set(annotation);
       this.selectedTool.set('select');
-      // Ativar auto focus no campo de texto
-      this.shouldFocusTextInput = true;
+      this.shouldFocusTextInput.set(true);
     } else if (this.selectedTool() === 'select') {
-      // Clicou fora de qualquer anotação - fechar sidebar
       this.closeEditSidebar();
     } else if (this.selectedTool() === 'pencil') {
-      // Iniciar desenho com lápis
       this.startDrawing(event);
     } else if (this.selectedTool() === 'eraser') {
-      // Iniciar modo de apagar
       this.startErasing(event);
     }
   }
 
-  // Métodos de desenho com lápis
+  onAnnotationMouseDown(data: { annotation: TextAnnotation; event: MouseEvent }): void {
+    if (this.selectedTool() === 'select') {
+      this.isDragging = true;
+      this.hasMoved = false;
+      this.dragStartX = data.event.clientX;
+      this.dragStartY = data.event.clientY;
+      this.dragAnnotationStartX = data.annotation.x;
+      this.dragAnnotationStartY = data.annotation.y;
+      this.draggedAnnotation = data.annotation;
+
+      document.addEventListener('mousemove', this.onMouseMove);
+      document.addEventListener('mouseup', this.onMouseUp);
+    }
+  }
+
+  // Drawing methods
   private startDrawing(event: MouseEvent): void {
-    const rect = this.annotationLayer.nativeElement.getBoundingClientRect();
+    if (!this.annotationLayerElement) return;
+
+    const rect = this.annotationLayerElement.getBoundingClientRect();
     const x = (event.clientX - rect.left) / this.zoom();
     const y = (event.clientY - rect.top) / this.zoom();
 
@@ -563,9 +547,9 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
   }
 
   private onPencilMove = (event: MouseEvent): void => {
-    if (!this.isDrawing) return;
+    if (!this.isDrawing || !this.annotationLayerElement) return;
 
-    const rect = this.annotationLayer.nativeElement.getBoundingClientRect();
+    const rect = this.annotationLayerElement.getBoundingClientRect();
     const x = (event.clientX - rect.left) / this.zoom();
     const y = (event.clientY - rect.top) / this.zoom();
 
@@ -593,15 +577,16 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
     this.renderCurrentPage();
   };
 
-  // Métodos de borracha
+  // Eraser methods
   private isErasing = false;
   private lastEraseX = 0;
   private lastEraseY = 0;
 
   private startErasing(event: MouseEvent): void {
+    if (!this.annotationLayerElement) return;
+
     this.isErasing = true;
-    // Calcular posição relativa ao annotation-layer
-    const rect = this.annotationLayer.nativeElement.getBoundingClientRect();
+    const rect = this.annotationLayerElement.getBoundingClientRect();
     this.lastEraseX = event.clientX - rect.left;
     this.lastEraseY = event.clientY - rect.top;
     this.eraseAtPosition(event);
@@ -611,18 +596,16 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
   }
 
   private onEraserMove = (event: MouseEvent): void => {
-    if (!this.isErasing) return;
+    if (!this.isErasing || !this.annotationLayerElement) return;
 
-    // Durante o arraste, precisamos usar getBoundingClientRect porque o evento vem do document
-    const rect = this.annotationLayer.nativeElement.getBoundingClientRect();
+    const rect = this.annotationLayerElement.getBoundingClientRect();
     const currentX = event.clientX - rect.left;
     const currentY = event.clientY - rect.top;
 
-    // Interpolar entre a última posição e a atual para apagar continuamente
     const dx = currentX - this.lastEraseX;
     const dy = currentY - this.lastEraseY;
     const distance = Math.sqrt(dx * dx + dy * dy);
-    const step = this.eraserSize() / 4; // Passos menores para maior precisão
+    const step = this.eraserSize() / 4;
     const eraserRadiusScreen = this.eraserSize() / 2;
 
     if (distance > step) {
@@ -650,33 +633,30 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
   };
 
   onEraserCursorMove(event: MouseEvent): void {
-    if (this.selectedTool() !== 'eraser') {
+    if (this.selectedTool() !== 'eraser' || !this.annotationLayerElement) {
       this.eraserCursorVisible.set(false);
       return;
     }
 
-    // Calcular posição relativa ao annotation-layer
-    const rect = this.annotationLayer.nativeElement.getBoundingClientRect();
+    const rect = this.annotationLayerElement.getBoundingClientRect();
     const screenX = event.clientX - rect.left;
     const screenY = event.clientY - rect.top;
 
-    // O cursor visual é posicionado no centro do mouse
     this.eraserCursorX.set(screenX - this.eraserSize() / 2);
     this.eraserCursorY.set(screenY - this.eraserSize() / 2);
     this.eraserCursorVisible.set(true);
   }
 
-  // Retorna o tamanho visual real da borracha considerando o zoom
-  getEraserVisualSize(): number {
-    return this.eraserSize();
+  onEraserCursorLeave(): void {
+    this.eraserCursorVisible.set(false);
   }
 
   private eraseAtPosition(event: MouseEvent): void {
-    // Calcular posição relativa ao annotation-layer
-    const rect = this.annotationLayer.nativeElement.getBoundingClientRect();
+    if (!this.annotationLayerElement) return;
+
+    const rect = this.annotationLayerElement.getBoundingClientRect();
     const screenX = event.clientX - rect.left;
     const screenY = event.clientY - rect.top;
-    // O raio da borracha em pixels de tela
     const eraserRadiusScreen = this.eraserSize() / 2;
 
     this.eraseAtScreenCoords(screenX, screenY, eraserRadiusScreen);
@@ -688,8 +668,6 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
     radiusScreen: number
   ): void {
     const zoom = this.zoom();
-
-    // Verificar cada traço de lápis
     const pencilAnnotations = this.pencilAnnotations();
     let hasChanges = false;
 
@@ -705,10 +683,8 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
       if (result.modified) {
         hasChanges = true;
 
-        // Remover o traço original
         this.pdfService.removePencilAnnotation(pencil.id);
 
-        // Adicionar os segmentos restantes como novos traços
         for (const segment of result.remainingSegments) {
           if (segment.length >= 2) {
             this.pdfService.addPencilAnnotation({
@@ -728,16 +704,6 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
     }
   }
 
-  private eraseAtDocumentPosition(
-    x: number,
-    y: number,
-    eraserRadius: number
-  ): void {
-    const zoom = this.zoom();
-    // Converter para coordenadas de tela
-    this.eraseAtScreenCoords(x * zoom, y * zoom, eraserRadius * zoom);
-  }
-
   private eraseFromPathScreenCoords(
     screenX: number,
     screenY: number,
@@ -750,7 +716,6 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
     let currentSegment: { x: number; y: number }[] = [];
     let modified = false;
 
-    // Centro da borracha em coordenadas de documento
     const eraserDocX = screenX / zoom;
     const eraserDocY = screenY / zoom;
     const eraserDocRadius = radiusScreen / zoom;
@@ -766,7 +731,6 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
       if (isInsideEraser) {
         modified = true;
 
-        // Se o ponto anterior estava fora, calcular o ponto de interseção
         if (currentSegment.length > 0 && i > 0) {
           const prevPoint = points[i - 1];
           const intersection = this.getCircleLineIntersection(
@@ -783,22 +747,17 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
           }
         }
 
-        // Salvar o segmento atual se tiver pontos suficientes
         if (currentSegment.length >= 2) {
           remainingSegments.push([...currentSegment]);
         }
         currentSegment = [];
       } else {
-        // Ponto está fora da borracha
-
-        // Se estamos começando um novo segmento após apagar
         if (currentSegment.length === 0 && i > 0) {
           const prevPoint = points[i - 1];
           const prevDistance = Math.sqrt(
             (eraserDocX - prevPoint.x) ** 2 + (eraserDocY - prevPoint.y) ** 2
           );
 
-          // Se o ponto anterior estava dentro, calcular ponto de saída
           if (prevDistance <= eraserDocRadius) {
             const intersection = this.getCircleLineIntersection(
               eraserDocX,
@@ -819,7 +778,6 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
       }
     }
 
-    // Adicionar o último segmento se existir
     if (currentSegment.length >= 2) {
       remainingSegments.push(currentSegment);
     }
@@ -827,8 +785,6 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
     return { modified, remainingSegments };
   }
 
-  // Calcula o ponto de interseção entre um segmento de linha e um círculo
-  // Retorna o ponto mais próximo de (x1, y1)
   private getCircleLineIntersection(
     cx: number,
     cy: number,
@@ -856,12 +812,9 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
 
     discriminant = Math.sqrt(discriminant);
 
-    // Dois possíveis pontos de interseção
     const t1 = (-b - discriminant) / (2 * a);
     const t2 = (-b + discriminant) / (2 * a);
 
-    // Retornar o ponto que está no segmento (0 <= t <= 1)
-    // e mais próximo do ponto inicial
     if (t1 >= 0 && t1 <= 1) {
       return { x: x1 + t1 * dx, y: y1 + t1 * dy };
     }
@@ -872,80 +825,9 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
     return null;
   }
 
-  private eraseFromPath(
-    px: number,
-    py: number,
-    radius: number,
-    pencil: PencilAnnotation
-  ): { modified: boolean; remainingSegments: { x: number; y: number }[][] } {
-    // Delegar para a versão com coordenadas de tela
-    const zoom = this.zoom();
-    return this.eraseFromPathScreenCoords(
-      px * zoom,
-      py * zoom,
-      radius * zoom,
-      pencil,
-      zoom
-    );
-  }
-
-  private isPointNearPath(
-    px: number,
-    py: number,
-    radius: number,
-    points: { x: number; y: number }[],
-    strokeWidth: number
-  ): boolean {
-    const hitDistance = radius + strokeWidth / 2;
-
-    for (let i = 0; i < points.length - 1; i++) {
-      const p1 = points[i];
-      const p2 = points[i + 1];
-
-      if (
-        this.distanceToSegment(px, py, p1.x, p1.y, p2.x, p2.y) < hitDistance
-      ) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  private distanceToSegment(
-    px: number,
-    py: number,
-    x1: number,
-    y1: number,
-    x2: number,
-    y2: number
-  ): number {
-    const dx = x2 - x1;
-    const dy = y2 - y1;
-    const lengthSquared = dx * dx + dy * dy;
-
-    if (lengthSquared === 0) {
-      return Math.sqrt((px - x1) ** 2 + (py - y1) ** 2);
-    }
-
-    let t = ((px - x1) * dx + (py - y1) * dy) / lengthSquared;
-    t = Math.max(0, Math.min(1, t));
-
-    const closestX = x1 + t * dx;
-    const closestY = y1 + t * dy;
-
-    return Math.sqrt((px - closestX) ** 2 + (py - closestY) ** 2);
-  }
-
   private drawCurrentStroke(): void {
     if (!this.pdfCanvas || this.currentPencilPoints.length < 2) return;
 
-    const canvas = this.pdfCanvas.nativeElement;
-    const context = canvas.getContext('2d');
-    if (!context) return;
-
-    // Renderizar a página primeiro para limpar traços anteriores temporários
-    // e depois desenhar todos os traços persistentes + o atual
     this.renderCurrentPage().then(() => {
       this.drawAllPencilAnnotations();
       this.drawTemporaryStroke();
@@ -955,7 +837,7 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
   private drawTemporaryStroke(): void {
     if (!this.pdfCanvas || this.currentPencilPoints.length < 2) return;
 
-    const canvas = this.pdfCanvas.nativeElement;
+    const canvas = this.pdfCanvas;
     const context = canvas.getContext('2d');
     if (!context) return;
 
@@ -987,7 +869,7 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
   drawAllPencilAnnotations(): void {
     if (!this.pdfCanvas) return;
 
-    const canvas = this.pdfCanvas.nativeElement;
+    const canvas = this.pdfCanvas;
     const context = canvas.getContext('2d');
     if (!context) return;
 
@@ -1014,28 +896,9 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
     }
   }
 
-  // Métodos de arrastar (drag)
+  // Drag methods
   private hasMoved = false;
   private draggedAnnotation: TextAnnotation | null = null;
-
-  onAnnotationMouseDown(annotation: TextAnnotation, event: MouseEvent): void {
-    event.stopPropagation();
-    event.preventDefault();
-
-    if (this.selectedTool() === 'select') {
-      this.isDragging = true;
-      this.hasMoved = false;
-      this.dragStartX = event.clientX;
-      this.dragStartY = event.clientY;
-      this.dragAnnotationStartX = annotation.x;
-      this.dragAnnotationStartY = annotation.y;
-      this.draggedAnnotation = annotation;
-
-      // Adicionar listeners globais para capturar movimento fora do elemento
-      document.addEventListener('mousemove', this.onMouseMove);
-      document.addEventListener('mouseup', this.onMouseUp);
-    }
-  }
 
   private onMouseMove = (event: MouseEvent): void => {
     if (!this.isDragging || !this.draggedAnnotation) return;
@@ -1043,7 +906,6 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
     const deltaX = (event.clientX - this.dragStartX) / this.zoom();
     const deltaY = (event.clientY - this.dragStartY) / this.zoom();
 
-    // Só considera como movimento se deslocou mais de 3 pixels
     if (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3) {
       this.hasMoved = true;
     }
@@ -1057,7 +919,6 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
         y: newY,
       });
 
-      // Atualizar referência local para manter a posição sincronizada
       this.draggedAnnotation = { ...this.draggedAnnotation, x: newX, y: newY };
     }
   };
@@ -1069,34 +930,28 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
     const annotation = this.draggedAnnotation;
     const wasDragging = this.hasMoved;
 
-    // Resetar estados
     this.isDragging = false;
     this.hasMoved = false;
     this.draggedAnnotation = null;
 
-    // Se NÃO arrastou (foi apenas um clique), abrir sidebar para edição
     if (!wasDragging && annotation) {
       this.selectedAnnotation.set(annotation);
-      // Ativar auto focus no campo de texto
-      this.shouldFocusTextInput = true;
+      this.shouldFocusTextInput.set(true);
     } else if (wasDragging) {
-      // Atualizar thumbnails após arrastar
       this.updateThumbnailSnapshot();
     }
   };
 
-  updateAnnotationText(event: Event): void {
-    const input = event.target as HTMLInputElement;
+  // Annotation updates
+  updateAnnotationText(text: string): void {
     const selected = this.selectedAnnotation();
     if (selected) {
-      this.pdfService.updateAnnotation(selected.id, { text: input.value });
-      this.selectedAnnotation.set({ ...selected, text: input.value });
+      this.pdfService.updateAnnotation(selected.id, { text });
+      this.selectedAnnotation.set({ ...selected, text });
     }
   }
 
-  updateAnnotationFontSize(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    const size = parseInt(input.value, 10);
+  updateAnnotationFontSize(size: number): void {
     const selected = this.selectedAnnotation();
     if (selected && size > 0) {
       this.pdfService.updateAnnotation(selected.id, {
@@ -1109,20 +964,17 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
     }
   }
 
-  updateAnnotationColor(event: Event): void {
-    const input = event.target as HTMLInputElement;
+  updateAnnotationColor(color: string): void {
     const selected = this.selectedAnnotation();
     if (selected) {
-      this.pdfService.updateAnnotation(selected.id, { color: input.value });
-      this.selectedAnnotation.set({ ...selected, color: input.value });
+      this.pdfService.updateAnnotation(selected.id, { color });
+      this.selectedAnnotation.set({ ...selected, color });
     }
   }
 
-  updateAnnotationFontFamily(event: Event): void {
-    const select = event.target as HTMLSelectElement;
+  updateAnnotationFontFamily(fontFamily: FontFamily): void {
     const selected = this.selectedAnnotation();
     if (selected) {
-      const fontFamily = select.value as any;
       this.pdfService.updateAnnotation(selected.id, { fontFamily });
       this.selectedAnnotation.set({ ...selected, fontFamily });
     }
@@ -1164,6 +1016,11 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
     }
   }
 
+  onAnnotationFocused(): void {
+    this.shouldFocusTextInput.set(false);
+  }
+
+  // Download and reset
   async downloadPdf(): Promise<void> {
     this.isLoading.set(true);
     try {
@@ -1185,30 +1042,5 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
     this.totalPages.set(0);
     this.selectedAnnotation.set(null);
     this.fileName.set('');
-    if (this.fileInput) {
-      this.fileInput.nativeElement.value = '';
-    }
-  }
-
-  openFileDialog(): void {
-    this.fileInput.nativeElement.click();
-  }
-
-  // Helper para posicionar anotações
-  getAnnotationStyle(annotation: TextAnnotation) {
-    return {
-      left: `${annotation.x * this.zoom()}px`,
-      top: `${annotation.y * this.zoom()}px`,
-      fontSize: `${annotation.fontSize * this.zoom()}px`,
-      color: annotation.color,
-      fontFamily: annotation.fontFamily || 'Arial',
-      fontWeight: annotation.bold ? 'bold' : 'normal',
-      fontStyle: annotation.italic ? 'italic' : 'normal',
-      textDecoration: annotation.underline ? 'underline' : 'none',
-    };
-  }
-
-  isSelected(annotation: TextAnnotation): boolean {
-    return this.selectedAnnotation()?.id === annotation.id;
   }
 }

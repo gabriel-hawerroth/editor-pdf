@@ -1,0 +1,43 @@
+<div class="page-navigation">
+  <button
+    class="btn btn-icon"
+    (click)="previousPage.emit()"
+    [disabled]="currentPage() === 1"
+  >
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+    >
+      <path
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="2"
+        d="M15 19l-7-7 7-7"
+      />
+    </svg>
+  </button>
+  <span class="page-info">
+    Página {{ currentPage() }} de {{ totalPages() }}
+  </span>
+  <button
+    class="btn btn-icon"
+    (click)="nextPage.emit()"
+    [disabled]="currentPage() === totalPages()"
+  >
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+    >
+      <path
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="2"
+        d="M9 5l7 7-7 7"
+      />
+    </svg>
+  </button>
+</div>

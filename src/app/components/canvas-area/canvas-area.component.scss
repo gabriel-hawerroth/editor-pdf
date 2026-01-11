@@ -1,0 +1,119 @@
+$primary-color: #4f46e5;
+
+:host {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+
+.canvas-wrapper {
+  flex: 1;
+  overflow: auto;
+  padding: 2rem;
+  display: flex;
+  justify-content: center;
+  background-color: #525659;
+  position: relative;
+}
+
+.eyedropper-hint {
+  position: absolute;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background-color: $primary-color;
+  color: white;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  z-index: 100;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+  animation: slideDown 0.3s ease;
+
+  svg {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.canvas-container {
+  position: relative;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.pdf-canvas {
+  display: block;
+  background-color: white;
+}
+
+.annotation-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  cursor: crosshair;
+
+  &.eyedropper-active {
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Ccircle cx='2' cy='30' r='1.5' fill='%234f46e5'/%3E%3Cpath d='M4 28L12 20' stroke='%234f46e5' stroke-width='2' stroke-linecap='round'/%3E%3Crect x='10' y='8' width='12' height='16' rx='2' transform='rotate(45 16 16)' fill='white' stroke='%234f46e5' stroke-width='1.5'/%3E%3Cellipse cx='22' cy='10' rx='4' ry='3' transform='rotate(45 22 10)' fill='%234f46e5'/%3E%3C/svg%3E")
+        2 30,
+      crosshair;
+  }
+
+  &.eraser-active {
+    cursor: none;
+  }
+}
+
+.eraser-cursor {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid $primary-color;
+  border-radius: 50%;
+  pointer-events: none;
+  background-color: rgba($primary-color, 0.1);
+  z-index: 1000;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.8);
+}
+
+.text-annotation {
+  position: absolute;
+  cursor: move;
+  white-space: nowrap;
+  user-select: none;
+  padding: 2px 4px;
+  border-radius: 2px;
+  transition: background-color 0.2s ease;
+
+  &:hover {
+    background-color: rgba($primary-color, 0.1);
+  }
+
+  &.selected {
+    background-color: rgba($primary-color, 0.2);
+    outline: 2px solid $primary-color;
+    outline-offset: 2px;
+  }
+
+  &.dragging {
+    cursor: grabbing;
+    opacity: 0.8;
+    z-index: 1000;
+  }
+}

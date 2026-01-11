@@ -1,0 +1,55 @@
+$primary-color: #4f46e5;
+$border-color: #e5e7eb;
+$bg-light: #f9fafb;
+$text-primary: #111827;
+$text-secondary: #6b7280;
+
+:host {
+  display: block;
+}
+
+.page-navigation {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 1rem;
+  background-color: white;
+  border-top: 1px solid $border-color;
+
+  .page-info {
+    font-size: 0.875rem;
+    color: $text-secondary;
+  }
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  svg {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  &-icon {
+    padding: 0.5rem;
+    background-color: transparent;
+    color: $text-secondary;
+
+    &:hover:not(:disabled) {
+      background-color: $bg-light;
+      color: $text-primary;
+    }
+  }
+}
