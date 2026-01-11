@@ -1,0 +1,36 @@
+<div
+  class="thumbnail-container"
+  [class.active]="isActive"
+  [class.loading]="isLoading"
+  [class.drag-over]="isDragOver"
+  draggable="true"
+  (click)="onSelect()"
+  (dragstart)="onDragStart($event)"
+  (dragend)="onDragEnd($event)"
+  (dragover)="onDragOver($event)"
+  (dragleave)="onDragLeave($event)"
+  (drop)="onDrop($event)"
+>
+  <div class="drag-handle" title="Arraste para reordenar">
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+    >
+      <path
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="2"
+        d="M4 8h16M4 16h16"
+      />
+    </svg>
+  </div>
+  <canvas #thumbnailCanvas class="thumbnail-canvas"></canvas>
+  @if (isLoading) {
+  <div class="thumbnail-loader">
+    <div class="spinner-small"></div>
+  </div>
+  }
+  <span class="page-number">{{ pageNumber }}</span>
+</div>
