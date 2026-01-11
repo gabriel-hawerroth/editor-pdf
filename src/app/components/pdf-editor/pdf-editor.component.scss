@@ -86,9 +86,16 @@ $text-secondary: #6b7280;
       border-right: 1px solid $border-color;
     }
 
+    &.page-orientation {
+      padding: 0 0.5rem;
+    }
+
     &.text-options,
     &.pencil-options,
     &.eraser-options {
+      padding: 0 0.5rem;
+      border-right: 1px solid $border-color;
+
       label {
         display: flex;
         align-items: center;
@@ -208,6 +215,21 @@ $text-secondary: #6b7280;
     &.active {
       background-color: $primary-color;
       color: white;
+    }
+
+    &.btn-danger {
+      background-color: transparent;
+      color: $danger-color;
+
+      &:hover:not(:disabled) {
+        background-color: rgba($danger-color, 0.1);
+        color: $danger-hover;
+      }
+
+      &:disabled {
+        color: $text-secondary;
+        opacity: 0.4;
+      }
     }
   }
 

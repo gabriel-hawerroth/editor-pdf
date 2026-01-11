@@ -57,6 +57,10 @@ export class PdfService {
   private annotationsSignal = signal<TextAnnotation[]>([]);
   private pencilAnnotationsSignal = signal<PencilAnnotation[]>([]);
 
+  // IDs únicos para cada página do PDF
+  private pageIdsSignal = signal<string[]>([]);
+  readonly pageIds = this.pageIdsSignal.asReadonly();
+
   // Expor como readonly para o componente
   readonly annotations = this.annotationsSignal.asReadonly();
   readonly pencilAnnotations = this.pencilAnnotationsSignal.asReadonly();
@@ -73,6 +77,12 @@ export class PdfService {
     this.pdfDoc = await loadingTask.promise;
     this.annotationsSignal.set([]);
     this.pencilAnnotationsSignal.set([]);
+
+    // Gerar IDs únicos para cada página
+    const pageIds = Array.from({ length: this.pdfDoc.numPages }, () =>
+      crypto.randomUUID()
+    );
+    this.pageIdsSignal.set(pageIds);
 
     return this.pdfDoc;
   }
@@ -413,8 +423,150 @@ export class PdfService {
     const loadingTask = pdfjsLib.getDocument({ data: pdfBytes });
     this.pdfDoc = await loadingTask.promise;
 
+    // Adicionar ID para a nova página
+    this.pageIdsSignal.update((ids) => [...ids, crypto.randomUUID()]);
+
     // Retornar o número da nova página
     return this.pdfDoc.numPages;
+  }
+
+  async removePage(pageNumber: number): Promise<number> {
+    if (!this.originalPdfBytes) {
+      throw new Error('PDF não carregado');
+    }
+
+    // Carregar o PDF atual com pdf-lib
+    const pdfDoc = await PDFDocument.load(this.originalPdfBytes);
+    const totalPages = pdfDoc.getPageCount();
+
+    if (totalPages <= 1) {
+      throw new Error('Não é possível remover a última página do documento');
+    }
+
+    if (pageNumber < 1 || pageNumber > totalPages) {
+      throw new Error('Número de página inválido');
+    }
+
+    // Remover a página (índice é base 0)
+    pdfDoc.removePage(pageNumber - 1);
+
+    // Salvar o PDF modificado
+    const pdfBytes = await pdfDoc.save();
+    this.originalPdfBytes = new Uint8Array(pdfBytes).buffer as ArrayBuffer;
+
+    // Recarregar o documento no pdfjs
+    const loadingTask = pdfjsLib.getDocument({ data: pdfBytes });
+    this.pdfDoc = await loadingTask.promise;
+
+    // Remover o ID da página removida
+    this.pageIdsSignal.update((ids) =>
+      ids.filter((_, index) => index !== pageNumber - 1)
+    );
+
+    // Remover anotações da página removida e atualizar números das páginas seguintes
+    this.annotationsSignal.update((annotations) =>
+      annotations
+        .filter((a) => a.pageNumber !== pageNumber)
+        .map((a) => ({
+          ...a,
+          pageNumber:
+            a.pageNumber > pageNumber ? a.pageNumber - 1 : a.pageNumber,
+        }))
+    );
+
+    this.pencilAnnotationsSignal.update((annotations) =>
+      annotations
+        .filter((a) => a.pageNumber !== pageNumber)
+        .map((a) => ({
+          ...a,
+          pageNumber:
+            a.pageNumber > pageNumber ? a.pageNumber - 1 : a.pageNumber,
+        }))
+    );
+
+    // Limpar cache de renderização para forçar re-render de todos os thumbnails
+    this.renderingPage.clear();
+    this.renderVersion.clear();
+
+    // Retornar o novo número total de páginas
+    return this.pdfDoc.numPages;
+  }
+
+  async movePage(fromIndex: number, toIndex: number): Promise<void> {
+    if (!this.originalPdfBytes) {
+      throw new Error('PDF não carregado');
+    }
+
+    // Carregar o PDF atual com pdf-lib
+    const pdfDoc = await PDFDocument.load(this.originalPdfBytes);
+    const totalPages = pdfDoc.getPageCount();
+
+    if (
+      fromIndex < 0 ||
+      fromIndex >= totalPages ||
+      toIndex < 0 ||
+      toIndex >= totalPages
+    ) {
+      throw new Error('Índices de página inválidos');
+    }
+
+    if (fromIndex === toIndex) {
+      return; // Nada a fazer
+    }
+
+    // Criar um novo documento com as páginas na ordem correta
+    const newPdfDoc = await PDFDocument.create();
+
+    // Gerar a nova ordem dos índices
+    const pageOrder = Array.from({ length: totalPages }, (_, i) => i);
+    const [removed] = pageOrder.splice(fromIndex, 1);
+    pageOrder.splice(toIndex, 0, removed);
+
+    // Copiar páginas na nova ordem
+    for (const pageIdx of pageOrder) {
+      const [copiedPage] = await newPdfDoc.copyPages(pdfDoc, [pageIdx]);
+      newPdfDoc.addPage(copiedPage);
+    }
+
+    // Salvar o PDF modificado
+    const pdfBytes = await newPdfDoc.save();
+    this.originalPdfBytes = new Uint8Array(pdfBytes).buffer as ArrayBuffer;
+
+    // Recarregar o documento no pdfjs
+    const loadingTask = pdfjsLib.getDocument({ data: pdfBytes });
+    this.pdfDoc = await loadingTask.promise;
+
+    // Atualizar os IDs das páginas para refletir a nova ordem
+    this.pageIdsSignal.update((ids) => {
+      const newIds = [...ids];
+      const [movedId] = newIds.splice(fromIndex, 1);
+      newIds.splice(toIndex, 0, movedId);
+      return newIds;
+    });
+
+    // Atualizar os números de página das anotações
+    const oldToNew = new Map<number, number>();
+    for (let i = 0; i < totalPages; i++) {
+      oldToNew.set(pageOrder[i] + 1, i + 1);
+    }
+
+    this.annotationsSignal.update((annotations) =>
+      annotations.map((a) => ({
+        ...a,
+        pageNumber: oldToNew.get(a.pageNumber) ?? a.pageNumber,
+      }))
+    );
+
+    this.pencilAnnotationsSignal.update((annotations) =>
+      annotations.map((a) => ({
+        ...a,
+        pageNumber: oldToNew.get(a.pageNumber) ?? a.pageNumber,
+      }))
+    );
+
+    // Limpar cache de renderização
+    this.renderingPage.clear();
+    this.renderVersion.clear();
   }
 
   async exportPdf(): Promise<Uint8Array> {
@@ -664,5 +816,185 @@ export class PdfService {
     this.annotationsSignal.set([]);
     this.pencilAnnotationsSignal.set([]);
     this.renderingPage.clear();
+  }
+
+  /**
+   * Rotaciona uma página para a esquerda (90° anti-horário)
+   */
+  async rotatePageLeft(pageNumber: number): Promise<void> {
+    await this.rotatePage(pageNumber, -90);
+  }
+
+  /**
+   * Rotaciona uma página para a direita (90° horário)
+   */
+  async rotatePageRight(pageNumber: number): Promise<void> {
+    await this.rotatePage(pageNumber, 90);
+  }
+
+  /**
+   * Rotaciona uma página pelo ângulo especificado
+   */
+  private async rotatePage(pageNumber: number, degrees: number): Promise<void> {
+    if (!this.originalPdfBytes) {
+      throw new Error('PDF não carregado');
+    }
+
+    const pdfDoc = await PDFDocument.load(this.originalPdfBytes);
+    const totalPages = pdfDoc.getPageCount();
+
+    if (pageNumber < 1 || pageNumber > totalPages) {
+      throw new Error('Número de página inválido');
+    }
+
+    const page = pdfDoc.getPage(pageNumber - 1);
+    const currentRotation = page.getRotation().angle;
+    const newRotation = (currentRotation + degrees + 360) % 360;
+    page.setRotation({ type: 'degrees', angle: newRotation } as any);
+
+    // Salvar o PDF modificado
+    const pdfBytes = await pdfDoc.save();
+    this.originalPdfBytes = new Uint8Array(pdfBytes).buffer as ArrayBuffer;
+
+    // Recarregar o documento no pdfjs
+    const loadingTask = pdfjsLib.getDocument({ data: pdfBytes });
+    this.pdfDoc = await loadingTask.promise;
+
+    // Atualizar o ID da página modificada para forçar re-render do thumbnail
+    this.pageIdsSignal.update((ids) =>
+      ids.map((id, index) =>
+        index === pageNumber - 1 ? crypto.randomUUID() : id
+      )
+    );
+
+    // Limpar cache de renderização
+    this.renderingPage.clear();
+    this.renderVersion.clear();
+  }
+
+  /**
+   * Inverte a página na vertical (flip vertical - espelha de cima para baixo)
+   * Implementado usando rotação de 180° seguido de flip horizontal
+   */
+  async flipPageVertical(pageNumber: number): Promise<void> {
+    if (!this.originalPdfBytes) {
+      throw new Error('PDF não carregado');
+    }
+
+    // Flip vertical = rotação 180° + flip horizontal
+    // Ou podemos usar a abordagem de renderizar para imagem e inverter
+    await this.flipPageUsingCanvas(pageNumber, 'vertical');
+  }
+
+  /**
+   * Inverte a página na horizontal (flip horizontal - espelha da esquerda para direita)
+   */
+  async flipPageHorizontal(pageNumber: number): Promise<void> {
+    if (!this.originalPdfBytes) {
+      throw new Error('PDF não carregado');
+    }
+
+    await this.flipPageUsingCanvas(pageNumber, 'horizontal');
+  }
+
+  /**
+   * Implementação de flip usando canvas para renderizar e inverter a página
+   */
+  private async flipPageUsingCanvas(
+    pageNumber: number,
+    direction: 'horizontal' | 'vertical'
+  ): Promise<void> {
+    if (!this.pdfDoc || !this.originalPdfBytes) {
+      throw new Error('PDF não carregado');
+    }
+
+    const totalPages = this.pdfDoc.numPages;
+
+    if (pageNumber < 1 || pageNumber > totalPages) {
+      throw new Error('Número de página inválido');
+    }
+
+    // Renderizar a página atual para um canvas
+    const page = await this.pdfDoc.getPage(pageNumber);
+    const viewport = page.getViewport({ scale: 2 }); // Escala alta para qualidade
+
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const context = canvas.getContext('2d')!;
+
+    await page.render({
+      canvasContext: context,
+      viewport: viewport,
+      canvas: canvas,
+    } as any).promise;
+
+    // Criar novo canvas com a imagem invertida
+    const flippedCanvas = document.createElement('canvas');
+    flippedCanvas.width = viewport.width;
+    flippedCanvas.height = viewport.height;
+    const flippedContext = flippedCanvas.getContext('2d')!;
+
+    // Aplicar transformação de flip
+    if (direction === 'horizontal') {
+      flippedContext.translate(viewport.width, 0);
+      flippedContext.scale(-1, 1);
+    } else {
+      flippedContext.translate(0, viewport.height);
+      flippedContext.scale(1, -1);
+    }
+
+    flippedContext.drawImage(canvas, 0, 0);
+
+    // Converter para imagem
+    const imageDataUrl = flippedCanvas.toDataURL('image/png', 1.0);
+    const imageBytes = await fetch(imageDataUrl).then((res) =>
+      res.arrayBuffer()
+    );
+
+    // Criar novo documento PDF com a página invertida
+    const pdfDoc = await PDFDocument.load(this.originalPdfBytes);
+    const newPdfDoc = await PDFDocument.create();
+
+    for (let i = 0; i < totalPages; i++) {
+      if (i === pageNumber - 1) {
+        // Página a ser invertida - usar imagem
+        const originalPage = pdfDoc.getPage(i);
+        const { width, height } = originalPage.getSize();
+
+        const image = await newPdfDoc.embedPng(imageBytes);
+        const newPage = newPdfDoc.addPage([width, height]);
+
+        newPage.drawImage(image, {
+          x: 0,
+          y: 0,
+          width: width,
+          height: height,
+        });
+      } else {
+        // Copiar página normalmente
+        const [copiedPage] = await newPdfDoc.copyPages(pdfDoc, [i]);
+        newPdfDoc.addPage(copiedPage);
+      }
+    }
+
+    // Salvar o PDF modificado
+    const pdfBytes = await newPdfDoc.save();
+    this.originalPdfBytes = new Uint8Array(pdfBytes).buffer as ArrayBuffer;
+
+    // Recarregar o documento no pdfjs
+    const loadingTask = pdfjsLib.getDocument({ data: pdfBytes });
+    this.pdfDoc = await loadingTask.promise;
+
+    // Atualizar o ID da página modificada para forçar re-render do thumbnail
+    this.pageIdsSignal.update((ids) =>
+      ids.map((id, index) =>
+        index === pageNumber - 1 ? crypto.randomUUID() : id
+      )
+    );
+
+    // Limpar cache de renderização
+    this.renderingPage.clear();
+    this.renderVersion.clear();
   }
 }

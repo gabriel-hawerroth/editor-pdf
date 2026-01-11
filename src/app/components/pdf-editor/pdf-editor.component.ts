@@ -97,9 +97,12 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
       .filter((a) => a.pageNumber === this.currentPage())
   );
 
-  // Array de números de páginas para o ngFor
+  // Array de páginas com IDs únicos para tracking otimizado
   pages = computed(() =>
-    Array.from({ length: this.totalPages() }, (_, i) => i + 1)
+    this.pdfService.pageIds().map((id, index) => ({
+      id,
+      displayNumber: index + 1,
+    }))
   );
 
   // Snapshot de anotações para thumbnails - só atualiza em momentos específicos
@@ -280,6 +283,140 @@ export class PdfEditorComponent implements AfterViewChecked, OnDestroy {
     } catch (error) {
       console.error('Erro ao adicionar nova página:', error);
       alert('Erro ao adicionar nova página.');
+    } finally {
+      this.isLoading.set(false);
+    }
+  }
+
+  async removeCurrentPage(): Promise<void> {
+    if (!this.pdfLoaded() || this.totalPages() <= 1) return;
+
+    const confirmRemove = confirm(
+      `Tem certeza que deseja remover a página ${this.currentPage()}? Esta ação não pode ser desfeita.`
+    );
+    if (!confirmRemove) return;
+
+    this.isLoading.set(true);
+    try {
+      const pageToRemove = this.currentPage();
+      const newTotalPages = await this.pdfService.removePage(pageToRemove);
+      this.totalPages.set(newTotalPages);
+
+      // Ajustar página atual se necessário
+      if (this.currentPage() > newTotalPages) {
+        this.currentPage.set(newTotalPages);
+      }
+
+      this.selectedAnnotation.set(null);
+      this.updateThumbnailSnapshot();
+      await this.renderCurrentPage();
+    } catch (error) {
+      console.error('Erro ao remover página:', error);
+      alert('Erro ao remover página.');
+    } finally {
+      this.isLoading.set(false);
+    }
+  }
+
+  async rotatePageLeft(): Promise<void> {
+    if (!this.pdfLoaded()) return;
+
+    this.isLoading.set(true);
+    try {
+      await this.pdfService.rotatePageLeft(this.currentPage());
+      this.updateThumbnailSnapshot();
+      await this.renderCurrentPage();
+    } catch (error) {
+      console.error('Erro ao rotacionar página:', error);
+      alert('Erro ao rotacionar página.');
+    } finally {
+      this.isLoading.set(false);
+    }
+  }
+
+  async rotatePageRight(): Promise<void> {
+    if (!this.pdfLoaded()) return;
+
+    this.isLoading.set(true);
+    try {
+      await this.pdfService.rotatePageRight(this.currentPage());
+      this.updateThumbnailSnapshot();
+      await this.renderCurrentPage();
+    } catch (error) {
+      console.error('Erro ao rotacionar página:', error);
+      alert('Erro ao rotacionar página.');
+    } finally {
+      this.isLoading.set(false);
+    }
+  }
+
+  async flipPageVertical(): Promise<void> {
+    if (!this.pdfLoaded()) return;
+
+    this.isLoading.set(true);
+    try {
+      await this.pdfService.flipPageVertical(this.currentPage());
+      this.updateThumbnailSnapshot();
+      await this.renderCurrentPage();
+    } catch (error) {
+      console.error('Erro ao inverter página:', error);
+      alert('Erro ao inverter página.');
+    } finally {
+      this.isLoading.set(false);
+    }
+  }
+
+  async flipPageHorizontal(): Promise<void> {
+    if (!this.pdfLoaded()) return;
+
+    this.isLoading.set(true);
+    try {
+      await this.pdfService.flipPageHorizontal(this.currentPage());
+      this.updateThumbnailSnapshot();
+      await this.renderCurrentPage();
+    } catch (error) {
+      console.error('Erro ao inverter página:', error);
+      alert('Erro ao inverter página.');
+    } finally {
+      this.isLoading.set(false);
+    }
+  }
+
+  async onPageReorder(event: {
+    fromIndex: number;
+    toIndex: number;
+  }): Promise<void> {
+    if (!this.pdfLoaded()) return;
+
+    this.isLoading.set(true);
+    try {
+      const { fromIndex, toIndex } = event;
+
+      // Calcular a nova posição da página atual após a reordenação
+      const currentPageIndex = this.currentPage() - 1;
+      let newCurrentPage = this.currentPage();
+
+      if (currentPageIndex === fromIndex) {
+        // A página atual está sendo movida
+        newCurrentPage = toIndex + 1;
+      } else if (fromIndex < currentPageIndex && toIndex >= currentPageIndex) {
+        // Uma página antes da atual foi movida para depois
+        newCurrentPage = this.currentPage() - 1;
+      } else if (fromIndex > currentPageIndex && toIndex <= currentPageIndex) {
+        // Uma página depois da atual foi movida para antes
+        newCurrentPage = this.currentPage() + 1;
+      }
+
+      await this.pdfService.movePage(fromIndex, toIndex);
+
+      // Atualizar a página atual
+      this.currentPage.set(newCurrentPage);
+      this.selectedAnnotation.set(null);
+      this.updateThumbnailSnapshot();
+      await this.renderCurrentPage();
+    } catch (error) {
+      console.error('Erro ao reordenar página:', error);
+      alert('Erro ao reordenar página.');
     } finally {
       this.isLoading.set(false);
     }
