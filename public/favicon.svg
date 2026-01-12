@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- PDF Document -->
+  <rect x="8" y="4" width="40" height="52" rx="3" fill="#fff" stroke="#e53935" stroke-width="2"/>
+
+  <!-- PDF folded corner -->
+  <path d="M38 4 L48 14 L38 14 Z" fill="#ffcdd2" stroke="#e53935" stroke-width="1"/>
+
+  <!-- PDF text lines -->
+  <rect x="14" y="20" width="20" height="3" rx="1" fill="#e53935" opacity="0.6"/>
+  <rect x="14" y="27" width="24" height="3" rx="1" fill="#e53935" opacity="0.4"/>
+  <rect x="14" y="34" width="18" height="3" rx="1" fill="#e53935" opacity="0.4"/>
+  <rect x="14" y="41" width="22" height="3" rx="1" fill="#e53935" opacity="0.4"/>
+
+  <!-- PDF label -->
+  <rect x="12" y="48" width="24" height="10" rx="2" fill="#e53935"/>
+  <text x="24" y="56" font-family="Arial, sans-serif" font-size="7" font-weight="bold" fill="#fff" text-anchor="middle">PDF</text>
+
+  <!-- Pencil -->
+  <g transform="translate(30, 20) rotate(45)">
+    <!-- Pencil body -->
+    <rect x="0" y="0" width="8" height="32" rx="1" fill="#ffc107"/>
+    <rect x="0" y="0" width="8" height="32" rx="1" fill="url(#pencilGradient)"/>
+
+    <!-- Pencil tip -->
+    <polygon points="0,32 4,40 8,32" fill="#ffecb3"/>
+    <polygon points="3,36 4,40 5,36" fill="#424242"/>
+
+    <!-- Pencil top (eraser) -->
+    <rect x="0" y="-4" width="8" height="4" rx="1" fill="#f48fb1"/>
+
+    <!-- Pencil metal band -->
+    <rect x="0" y="0" width="8" height="3" fill="#90a4ae"/>
+  </g>
+
+  <!-- Gradient for pencil -->
+  <defs>
+    <linearGradient id="pencilGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ffc107"/>
+      <stop offset="50%" stop-color="#ffca28"/>
+      <stop offset="100%" stop-color="#ffa000"/>
+    </linearGradient>
+  </defs>
+</svg>
