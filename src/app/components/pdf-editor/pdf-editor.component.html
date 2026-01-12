@@ -1,4 +1,4 @@
-<div class="pdf-editor">
+<main class="pdf-editor">
   <!-- Upload Area -->
   @if (!pdfLoaded()) {
   <app-upload-area (fileSelected)="onFileSelected($event)" />
@@ -102,4 +102,4 @@
 
   <!-- Loading Overlay -->
   <app-loading-overlay [isLoading]="isLoading()" />
-</div>
+</main>
