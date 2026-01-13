@@ -108,3 +108,41 @@ $bg-light: #f9fafb;
     height: 1.25rem;
   }
 }
+
+// Responsive
+@media (max-width: 768px) {
+  .pages-sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 150;
+    width: 140px;
+    transform: translateX(0);
+    transition: transform 0.3s ease;
+
+    &.closed {
+      transform: translateX(-100%);
+    }
+  }
+
+  .toggle-sidebar-btn {
+    padding: 0.5rem 0.375rem;
+
+    svg {
+      width: 0.875rem;
+      height: 0.875rem;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .pages-sidebar {
+    width: 120px;
+
+    .pages-list {
+      padding: 0.5rem;
+      gap: 0.5rem;
+    }
+  }
+}

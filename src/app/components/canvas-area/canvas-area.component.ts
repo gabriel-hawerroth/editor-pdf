@@ -50,9 +50,14 @@ export class CanvasAreaComponent {
   readonly canvasReady = output<HTMLCanvasElement>();
   readonly annotationLayerReady = output<HTMLDivElement>();
   readonly canvasMouseDown = output<MouseEvent>();
+  readonly canvasTouchStart = output<TouchEvent>();
   readonly annotationMouseDown = output<{
     annotation: TextAnnotation;
     event: MouseEvent;
+  }>();
+  readonly annotationTouchStart = output<{
+    annotation: TextAnnotation;
+    event: TouchEvent;
   }>();
   readonly eraserCursorMove = output<MouseEvent>();
   readonly eraserCursorLeave = output<void>();
@@ -86,10 +91,20 @@ export class CanvasAreaComponent {
     this.canvasMouseDown.emit(event);
   }
 
+  onCanvasTouchStart(event: TouchEvent): void {
+    this.canvasTouchStart.emit(event);
+  }
+
   onAnnotationMouseDown(annotation: TextAnnotation, event: MouseEvent): void {
     event.stopPropagation();
     event.preventDefault();
     this.annotationMouseDown.emit({ annotation, event });
+  }
+
+  onAnnotationTouchStart(annotation: TextAnnotation, event: TouchEvent): void {
+    event.stopPropagation();
+    event.preventDefault();
+    this.annotationTouchStart.emit({ annotation, event });
   }
 
   onEraserCursorMove(event: MouseEvent): void {

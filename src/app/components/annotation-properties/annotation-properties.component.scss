@@ -146,5 +146,47 @@ $text-secondary: #6b7280;
     border-left: none;
     border-top: 1px solid $border-color;
     border-radius: 1rem 1rem 0 0;
+    padding: 1rem;
+    z-index: 200;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+    overflow-y: auto;
+
+    h3 {
+      font-size: 0.875rem;
+      margin-bottom: 1rem;
+    }
+
+    .property-group {
+      margin-bottom: 0.75rem;
+
+      label {
+        font-size: 0.75rem;
+        margin-bottom: 0.25rem;
+      }
+
+      .style-buttons {
+        .btn-style {
+          padding: 0.375rem;
+          font-size: 0.875rem;
+        }
+      }
+    }
+
+    .btn-danger {
+      padding: 0.625rem;
+      font-size: 0.8125rem;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .properties-panel {
+    max-height: 45vh;
+    padding: 0.75rem;
+
+    h3 {
+      font-size: 0.8125rem;
+      margin-bottom: 0.75rem;
+    }
   }
 }

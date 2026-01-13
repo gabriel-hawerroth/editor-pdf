@@ -30,7 +30,11 @@
       class="annotation-layer"
       [class.eyedropper-active]="eyedropperActive()"
       [class.eraser-active]="selectedTool() === 'eraser'"
+      [class.drawing-mode]="
+        selectedTool() === 'pencil' || selectedTool() === 'eraser'
+      "
       (mousedown)="onCanvasMouseDown($event)"
+      (touchstart)="onCanvasTouchStart($event)"
       (mousemove)="onEraserCursorMove($event)"
       (mouseleave)="onEraserCursorLeave()"
     >
@@ -41,6 +45,7 @@
         [class.dragging]="isDragging() && isSelected(annotation)"
         [ngStyle]="getAnnotationStyle(annotation)"
         (mousedown)="onAnnotationMouseDown(annotation, $event)"
+        (touchstart)="onAnnotationTouchStart(annotation, $event)"
       >
         {{ annotation.text }}
       </div>

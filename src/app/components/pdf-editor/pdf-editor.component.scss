@@ -7,12 +7,14 @@ $bg-light: #f9fafb;
   background-color: $bg-light;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
     Ubuntu, sans-serif;
+  overflow: hidden;
 }
 
 .editor-container {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  overflow: hidden;
 }
 
 .main-content {
@@ -20,4 +22,21 @@ $bg-light: #f9fafb;
   display: flex;
   overflow: hidden;
   position: relative;
+}
+
+// Responsive
+@media (max-width: 768px) {
+  .main-content {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 480px) {
+  .pdf-editor {
+    height: 100dvh; // Dynamic viewport height for mobile browsers
+  }
+
+  .editor-container {
+    height: 100dvh;
+  }
 }

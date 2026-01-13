@@ -57,6 +57,8 @@ export class PdfEditorComponent implements OnDestroy {
   readonly currentPage = signal(1);
   readonly totalPages = signal(0);
   readonly zoom = signal(1.5);
+  readonly minZoom = 0.25; // Permite zoom menor para PDFs grandes
+  readonly maxZoom = 3;
   readonly selectedTool = signal<Tool>('select');
   readonly selectedAnnotation = signal<TextAnnotation | null>(null);
   readonly isLoading = signal(false);
@@ -408,12 +410,12 @@ export class PdfEditorComponent implements OnDestroy {
 
   // Zoom
   zoomIn(): void {
-    this.zoom.update((z) => Math.min(z + 0.25, 3));
+    this.zoom.update((z) => Math.min(z + 0.25, this.maxZoom));
     this.renderCurrentPage();
   }
 
   zoomOut(): void {
-    this.zoom.update((z) => Math.max(z - 0.25, 0.5));
+    this.zoom.update((z) => Math.max(z - 0.25, this.minZoom));
     this.renderCurrentPage();
   }
 
@@ -529,6 +531,46 @@ export class PdfEditorComponent implements OnDestroy {
     }
   }
 
+  // Canvas touch events (mobile support)
+  onCanvasTouchStart(event: TouchEvent): void {
+    if (event.touches.length !== 1) return;
+
+    const touch = event.touches[0];
+
+    if (this.selectedTool() === 'text') {
+      if (!this.annotationLayerElement) return;
+
+      const rect = this.annotationLayerElement.getBoundingClientRect();
+      const x = (touch.clientX - rect.left) / this.zoom();
+      const y = (touch.clientY - rect.top) / this.zoom();
+
+      const annotation = this.pdfService.addAnnotation({
+        text: 'Novo texto',
+        x: x,
+        y: y,
+        fontSize: this.fontSize() / this.zoom(),
+        color: this.textColor(),
+        pageNumber: this.currentPage(),
+        fontFamily: 'Arial',
+        bold: false,
+        italic: false,
+        underline: false,
+      });
+
+      this.selectedAnnotation.set(annotation);
+      this.selectedTool.set('select');
+      this.shouldFocusTextInput.set(true);
+    } else if (this.selectedTool() === 'select') {
+      this.closeEditSidebar();
+    } else if (this.selectedTool() === 'pencil') {
+      event.preventDefault();
+      this.startDrawingTouch(touch);
+    } else if (this.selectedTool() === 'eraser') {
+      event.preventDefault();
+      this.startErasingTouch(touch);
+    }
+  }
+
   onAnnotationMouseDown(data: {
     annotation: TextAnnotation;
     event: MouseEvent;
@@ -548,6 +590,30 @@ export class PdfEditorComponent implements OnDestroy {
     }
   }
 
+  // Touch support for annotation dragging
+  onAnnotationTouchStart(data: {
+    annotation: TextAnnotation;
+    event: TouchEvent;
+  }): void {
+    if (this.selectedTool() === 'select' && data.event.touches.length === 1) {
+      const touch = data.event.touches[0];
+      this.isDragging.set(true);
+      this.hasMoved.set(false);
+      this.dragStart.set({ x: touch.clientX, y: touch.clientY });
+      this.dragAnnotationStart.set({
+        x: data.annotation.x,
+        y: data.annotation.y,
+      });
+      this.draggedAnnotation.set(data.annotation);
+
+      document.addEventListener('touchmove', this.onTouchMove, {
+        passive: false,
+      });
+      document.addEventListener('touchend', this.onTouchEnd);
+      document.addEventListener('touchcancel', this.onTouchEnd);
+    }
+  }
+
   // Drawing methods
   private startDrawing(event: MouseEvent): void {
     if (!this.annotationLayerElement) return;
@@ -563,6 +629,24 @@ export class PdfEditorComponent implements OnDestroy {
     document.addEventListener('mouseup', this.onPencilUp);
   }
 
+  // Touch support for drawing
+  private startDrawingTouch(touch: Touch): void {
+    if (!this.annotationLayerElement) return;
+
+    const rect = this.annotationLayerElement.getBoundingClientRect();
+    const x = (touch.clientX - rect.left) / this.zoom();
+    const y = (touch.clientY - rect.top) / this.zoom();
+
+    this.isDrawing.set(true);
+    this.currentPencilPoints.set([{ x, y }]);
+
+    document.addEventListener('touchmove', this.onPencilTouchMove, {
+      passive: false,
+    });
+    document.addEventListener('touchend', this.onPencilTouchEnd);
+    document.addEventListener('touchcancel', this.onPencilTouchEnd);
+  }
+
   private onPencilMove = (event: MouseEvent): void => {
     if (!this.isDrawing() || !this.annotationLayerElement) return;
 
@@ -574,9 +658,44 @@ export class PdfEditorComponent implements OnDestroy {
     this.drawCurrentStroke();
   };
 
+  private onPencilTouchMove = (event: TouchEvent): void => {
+    if (!this.isDrawing() || !this.annotationLayerElement) return;
+    event.preventDefault();
+
+    const touch = event.touches[0];
+    const rect = this.annotationLayerElement.getBoundingClientRect();
+    const x = (touch.clientX - rect.left) / this.zoom();
+    const y = (touch.clientY - rect.top) / this.zoom();
+
+    this.currentPencilPoints.update((pts) => [...pts, { x, y }]);
+    this.drawCurrentStroke();
+  };
+
   private onPencilUp = (): void => {
     document.removeEventListener('mousemove', this.onPencilMove);
     document.removeEventListener('mouseup', this.onPencilUp);
+
+    const points = this.currentPencilPoints();
+    if (points.length > 1) {
+      this.pdfService.addPencilAnnotation({
+        points: [...points],
+        color: this.pencilColor(),
+        strokeWidth: this.pencilStrokeWidth(),
+        opacity: this.pencilOpacity(),
+        pageNumber: this.currentPage(),
+      });
+      this.updateThumbnailSnapshot();
+    }
+
+    this.isDrawing.set(false);
+    this.currentPencilPoints.set([]);
+    this.renderCurrentPage();
+  };
+
+  private onPencilTouchEnd = (): void => {
+    document.removeEventListener('touchmove', this.onPencilTouchMove);
+    document.removeEventListener('touchend', this.onPencilTouchEnd);
+    document.removeEventListener('touchcancel', this.onPencilTouchEnd);
 
     const points = this.currentPencilPoints();
     if (points.length > 1) {
@@ -612,6 +731,25 @@ export class PdfEditorComponent implements OnDestroy {
 
     document.addEventListener('mousemove', this.onEraserMove);
     document.addEventListener('mouseup', this.onEraserUp);
+  }
+
+  // Touch support for eraser
+  private startErasingTouch(touch: Touch): void {
+    if (!this.annotationLayerElement) return;
+
+    this.isErasing.set(true);
+    const rect = this.annotationLayerElement.getBoundingClientRect();
+    this.lastErasePos.set({
+      x: touch.clientX - rect.left,
+      y: touch.clientY - rect.top,
+    });
+    this.eraseAtPositionFromCoords(touch.clientX, touch.clientY);
+
+    document.addEventListener('touchmove', this.onEraserTouchMove, {
+      passive: false,
+    });
+    document.addEventListener('touchend', this.onEraserTouchEnd);
+    document.addEventListener('touchcancel', this.onEraserTouchEnd);
   }
 
   private onEraserMove = (event: MouseEvent): void => {
@@ -651,6 +789,46 @@ export class PdfEditorComponent implements OnDestroy {
     this.updateThumbnailSnapshot();
   };
 
+  private onEraserTouchMove = (event: TouchEvent): void => {
+    if (!this.isErasing() || !this.annotationLayerElement) return;
+    event.preventDefault();
+
+    const touch = event.touches[0];
+    const rect = this.annotationLayerElement.getBoundingClientRect();
+    const currentX = touch.clientX - rect.left;
+    const currentY = touch.clientY - rect.top;
+
+    const lastPos = this.lastErasePos();
+    const dx = currentX - lastPos.x;
+    const dy = currentY - lastPos.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    const step = this.eraserSize() / 4;
+    const eraserRadiusScreen = this.eraserSize() / 2;
+
+    if (distance > step) {
+      const steps = Math.ceil(distance / step);
+
+      for (let i = 1; i <= steps; i++) {
+        const t = i / steps;
+        const interpX = lastPos.x + dx * t;
+        const interpY = lastPos.y + dy * t;
+        this.eraseAtScreenCoords(interpX, interpY, eraserRadiusScreen);
+      }
+    } else {
+      this.eraseAtScreenCoords(currentX, currentY, eraserRadiusScreen);
+    }
+
+    this.lastErasePos.set({ x: currentX, y: currentY });
+  };
+
+  private onEraserTouchEnd = (): void => {
+    document.removeEventListener('touchmove', this.onEraserTouchMove);
+    document.removeEventListener('touchend', this.onEraserTouchEnd);
+    document.removeEventListener('touchcancel', this.onEraserTouchEnd);
+    this.isErasing.set(false);
+    this.updateThumbnailSnapshot();
+  };
+
   onEraserCursorMove(event: MouseEvent): void {
     if (this.selectedTool() !== 'eraser' || !this.annotationLayerElement) {
       this.eraserCursorVisible.set(false);
@@ -676,6 +854,17 @@ export class PdfEditorComponent implements OnDestroy {
     const rect = this.annotationLayerElement.getBoundingClientRect();
     const screenX = event.clientX - rect.left;
     const screenY = event.clientY - rect.top;
+    const eraserRadiusScreen = this.eraserSize() / 2;
+
+    this.eraseAtScreenCoords(screenX, screenY, eraserRadiusScreen);
+  }
+
+  private eraseAtPositionFromCoords(clientX: number, clientY: number): void {
+    if (!this.annotationLayerElement) return;
+
+    const rect = this.annotationLayerElement.getBoundingClientRect();
+    const screenX = clientX - rect.left;
+    const screenY = clientY - rect.top;
     const eraserRadiusScreen = this.eraserSize() / 2;
 
     this.eraseAtScreenCoords(screenX, screenY, eraserRadiusScreen);
@@ -941,9 +1130,57 @@ export class PdfEditorComponent implements OnDestroy {
     }
   };
 
+  private onTouchMove = (event: TouchEvent): void => {
+    const dragged = this.draggedAnnotation();
+    if (!this.isDragging() || !dragged || event.touches.length !== 1) return;
+    event.preventDefault();
+
+    const touch = event.touches[0];
+    const start = this.dragStart();
+    const deltaX = (touch.clientX - start.x) / this.zoom();
+    const deltaY = (touch.clientY - start.y) / this.zoom();
+
+    if (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3) {
+      this.hasMoved.set(true);
+    }
+
+    if (this.hasMoved()) {
+      const annotationStart = this.dragAnnotationStart();
+      const newX = annotationStart.x + deltaX;
+      const newY = annotationStart.y + deltaY;
+
+      this.pdfService.updateAnnotation(dragged.id, {
+        x: newX,
+        y: newY,
+      });
+
+      this.draggedAnnotation.set({ ...dragged, x: newX, y: newY });
+    }
+  };
+
   private onMouseUp = (): void => {
     document.removeEventListener('mousemove', this.onMouseMove);
     document.removeEventListener('mouseup', this.onMouseUp);
+
+    const annotation = this.draggedAnnotation();
+    const wasDragging = this.hasMoved();
+
+    this.isDragging.set(false);
+    this.hasMoved.set(false);
+    this.draggedAnnotation.set(null);
+
+    if (!wasDragging && annotation) {
+      this.selectedAnnotation.set(annotation);
+      this.shouldFocusTextInput.set(true);
+    } else if (wasDragging) {
+      this.updateThumbnailSnapshot();
+    }
+  };
+
+  private onTouchEnd = (): void => {
+    document.removeEventListener('touchmove', this.onTouchMove);
+    document.removeEventListener('touchend', this.onTouchEnd);
+    document.removeEventListener('touchcancel', this.onTouchEnd);
 
     const annotation = this.draggedAnnotation();
     const wasDragging = this.hasMoved();
