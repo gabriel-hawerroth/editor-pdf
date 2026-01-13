@@ -52,6 +52,8 @@ export class PdfService {
   private renderingPage: Map<string, boolean> = new Map();
   // Controle de versão para cancelar renderizações obsoletas
   private renderVersion: Map<string, number> = new Map();
+  // Armazenar RenderTasks ativas para cancelamento
+  private activeRenderTasks: Map<string, any> = new Map();
 
   // Usando signal para reatividade
   private annotationsSignal = signal<TextAnnotation[]>([]);
@@ -153,10 +155,20 @@ export class PdfService {
     const currentVersion = (this.renderVersion.get(renderKey) || 0) + 1;
     this.renderVersion.set(renderKey, currentVersion);
 
-    // Se já está renderizando, a versão anterior será invalidada
+    // Cancelar renderização anterior se existir
+    const previousTask = this.activeRenderTasks.get(renderKey);
+    if (previousTask) {
+      try {
+        previousTask.cancel();
+      } catch {
+        // Ignorar erros de cancelamento
+      }
+      this.activeRenderTasks.delete(renderKey);
+    }
+
+    // Se já está renderizando, aguardar um pouco
     if (this.renderingPage.get(renderKey)) {
-      // Aguardar um pouco para a renderização anterior terminar
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 10));
     }
 
     this.renderingPage.set(renderKey, true);
@@ -172,7 +184,7 @@ export class PdfService {
       const viewport = page.getViewport({ scale });
 
       // Limpar canvas antes de renderizar
-      const context = canvas.getContext('2d');
+      const context = canvas.getContext('2d', { willReadFrequently: true });
       if (!context) {
         throw new Error('Não foi possível obter contexto do canvas');
       }
@@ -186,11 +198,26 @@ export class PdfService {
         return { width: canvas.width, height: canvas.height };
       }
 
-      await page.render({
+      const renderTask = page.render({
         canvasContext: context,
         viewport: viewport,
         canvas: canvas,
-      } as any).promise;
+      } as any);
+
+      // Armazenar a task para possível cancelamento
+      this.activeRenderTasks.set(renderKey, renderTask);
+
+      try {
+        await renderTask.promise;
+      } catch (error: any) {
+        // Ignorar erros de cancelamento
+        if (error?.name === 'RenderingCancelledException') {
+          return { width: canvas.width, height: canvas.height };
+        }
+        throw error;
+      } finally {
+        this.activeRenderTasks.delete(renderKey);
+      }
 
       // Verificar após renderizar - se versão mudou, limpar canvas
       if (this.renderVersion.get(renderKey) !== currentVersion) {

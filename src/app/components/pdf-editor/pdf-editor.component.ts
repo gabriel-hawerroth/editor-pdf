@@ -105,6 +105,9 @@ export class PdfEditorComponent implements OnDestroy {
   private pdfCanvas: HTMLCanvasElement | null = null;
   private annotationLayerElement: HTMLDivElement | null = null;
 
+  // Cache da imagem do PDF para desenho rápido
+  private pdfImageData: ImageData | null = null;
+
   // Usando computed com o signal do serviço para reatividade
   annotations = computed(() =>
     this.pdfService
@@ -225,6 +228,19 @@ export class PdfEditorComponent implements OnDestroy {
       );
       this.canvasWidth.set(dimensions.width);
       this.canvasHeight.set(dimensions.height);
+
+      // Salvar a imagem do PDF para uso durante desenho
+      const context = this.pdfCanvas.getContext('2d', {
+        willReadFrequently: true,
+      });
+      if (context && dimensions.width > 0 && dimensions.height > 0) {
+        this.pdfImageData = context.getImageData(
+          0,
+          0,
+          dimensions.width,
+          dimensions.height
+        );
+      }
 
       this.drawAllPencilAnnotations();
     } catch (error) {
@@ -1037,10 +1053,13 @@ export class PdfEditorComponent implements OnDestroy {
     const points = this.currentPencilPoints();
     if (!this.pdfCanvas || points.length < 2) return;
 
-    this.renderCurrentPage().then(() => {
+    // Restaurar a imagem do PDF em cache em vez de re-renderizar
+    const context = this.pdfCanvas.getContext('2d');
+    if (context && this.pdfImageData) {
+      context.putImageData(this.pdfImageData, 0, 0);
       this.drawAllPencilAnnotations();
       this.drawTemporaryStroke();
-    });
+    }
   }
 
   private drawTemporaryStroke(): void {
